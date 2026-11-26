@@ -135,5 +135,6 @@ hooks/record.mjs        hooks から呼ばれ、承認待ちなどのイベン�
 hooks/statusline-tap.mjs statusline の前に挟み、使用枠を記録
 install-hooks.mjs       hooks の登録・解除
 install-usage.mjs       statusline 記録の登録・解除
-public/                 画面（HTML / CSS / JS）
+public/                 画面（HTML / CSS）
+public/js/              画面の処理（ES modules、ビルドなし。入口は main.js）
 ```

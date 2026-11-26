@@ -16,7 +16,7 @@ Claude Code の並列セッションを一覧するローカルダッシュボ�
 ```
 ~/.claude/sessions/<pid>.json ─┐
 ~/.claude/projects/**/*.jsonl ─┼─> lib/transcripts.mjs（索引） ─┐
-~/.claude-dashboard/events/*   ─┤                               ├─> server.mjs ─ SSE / JSON API ─> public/app.js
+~/.claude-dashboard/events/*   ─┤                               ├─> server.mjs ─ SSE / JSON API ─> public/js/main.js
 アプリの claude-code-sessions  ─┴─> lib/sessions.mjs（状態判定）─┘
 ```
 
@@ -24,7 +24,10 @@ Claude Code の並列セッションを一覧するローカルダッシュボ�
 - `lib/sessions.mjs`: `~/.claude/sessions/*.json` の busy / idle と、索引・hooks のイベント・`git status` から表示用の状態（`waiting` / `stalled` / `working` / `yours` / `idle`）と「閉じてよい」の4条件を決める。
 - `lib/review.mjs`: タイムラインから「作業中」と「あなたの番」の区間を組み立て、ふりかえりの集計をする。
 - `server.mjs`: `fs.watch` とポーリング（5秒）で変化を検知し、`/api/events`（SSE）で稼働中セッションを配信する。`/api/history`、`/api/search`、`/api/ledger`、`/api/session`、`/api/usage`、`/api/review` は都度計算する。
-- `public/app.js` が本体。つながり（`viz-map.js`）、ふりかえり（`viz-review.js`）、眺めるモード（`viz-orbit.js`）は別ファイルで、`app.js` より先に読み込まれて `window.CB` に登録し、`app.js` から道具（`esc` など）と表示・更新の合図を受け取る。
+- `public/js/` は素の ES modules（`<script type="module">`）で、ビルドなしでそのまま配る。入口は `main.js` で、配信を受けて各画面に渡し、画面の切り替えとクリックを受け付ける。グローバル変数で画面どうしをつながず、必要なものを import する。
+  - DOM に触らない: `format.js`（文字の整形と `esc()`）、`lanes.js`（盤面の列とプロジェクト別の並べ方）、`quota.js`（使用枠の計算）。`test/public.test.mjs` が node:test から直接読み込んで確かめる。DOM や `localStorage` を使う処理はここに入れない。
+  - 共有の状態: `live.js`（最新のデータと「確認した」の記録）、`dom.js`（`$`、`getJson`、`cssVar`、`reduceMotion` など）。
+  - 画面: `board.js`（呼び出し盤。前回との差分から強調・判子・めくれを出す）、`ledger.js`、`history.js`、`usage.js`、`detail.js`、`alerts.js`（音と通知）、`map.js`（つながり）、`review.js`（ふりかえり）、`orbit.js`（眺めるモード）。画面のモジュールは `init` / `show` / `hide` / `update` のうち必要なものを持つ（`main.js` 冒頭に説明がある）。
 - 眺めるモードの 3D は、ライブラリを使わず WebGL 2 を直接使って描く（依存を入れないため）。惑星は四角形の上で光線と球の交差を解いて描き、表面の模様もシェーダーの中でノイズから作る（プロジェクトごとに種類と模様が決まる）。奥行きを書き出してからピントのぼかしと太陽のまぶしさを仕上げで足す。名前・観測の印・観測カードへの線は、上に重ねた Canvas 2D に描く。太陽は世界に固定。背景の星雲と天の川は、開く前の空き時間に全天のパノラマとして作っておく。
 - 起動時に `~/.claude/projects` 全体の索引を作る（千件規模で数秒）。
 
@@ -38,8 +41,8 @@ Claude Code とデスクトップアプリの内部ファイルを読んでい�
 | 会話記録 jsonl | `type`, `message.content`, `timestamp`, `isSidechain`, `isMeta`, `gitBranch`, `cwd`, `entrypoint`, `custom-title` 行 | `lib/transcripts.mjs` |
 | 引き継ぎ文 | デスクトップアプリの `mcp__ccd_turn__wrap_up` ツール呼び出しの `input.recap` | `lib/transcripts.mjs` の `HANDOFF_TOOL` |
 | アプリのセッション記録 | `claude-code-sessions/**/local_*.json` の `sessionId`, `cliSessionId`, `priorCliSessionIds`, `title`, `isArchived` | `lib/sessions.mjs` の `loadAppSessions` |
-| アプリを開くリンク | `claude://code/continue?session=local_…` | `public/app.js` の `openActions` |
-| 使用枠 | statusline の入力の `rate_limits.<窓>.used_percentage` と `resets_at`（秒・ミリ秒・ISO 文字列のどれでも読めるようにしている） | `hooks/statusline-tap.mjs`, `public/app.js` |
+| アプリを開くリンク | `claude://code/continue?session=local_…` | `public/js/format.js` の `appUrl` |
+| 使用枠 | statusline の入力の `rate_limits.<窓>.used_percentage` と `resets_at`（秒・ミリ秒・ISO 文字列のどれでも読めるようにしている） | `hooks/statusline-tap.mjs`, `public/js/quota.js` |
 
 ## 画面のデザイン
 
@@ -54,7 +57,7 @@ Claude Code とデスクトップアプリの内部ファイルを読んでい�
 ## 確認の仕方
 
 ```bash
-for f in server.mjs install-*.mjs lib/*.mjs hooks/*.mjs public/app.js; do node --check "$f" || echo "NG: $f"; done
+for f in server.mjs install-*.mjs lib/*.mjs hooks/*.mjs public/js/*.js; do node --check "$f" || echo "NG: $f"; done
 npm test                    # node:test。HOME と CLAUDE_CONFIG_DIR を一時ディレクトリに向けて合成データで動かす
 PORT=4399 node server.mjs   # 動いている本番と別のポートで起動して確認する
 ```
