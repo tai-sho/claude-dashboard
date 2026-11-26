@@ -39,6 +39,7 @@ let original = null;
 try { original = JSON.parse(fs.readFileSync(ORIGINAL, 'utf8')); } catch {}
 if (!original?.command) process.exit(0);
 const child = spawn(original.command, { shell: true, stdio: ['pipe', 'inherit', 'inherit'], env: { ...process.env, [GUARD]: '1' } });
+child.stdin.on('error', () => {}); // 元のコマンドが入力を読まずに終わっても落ちない（EPIPE）
 child.stdin.end(input);
 child.on('exit', () => process.exit(0));
 child.on('error', () => process.exit(0));

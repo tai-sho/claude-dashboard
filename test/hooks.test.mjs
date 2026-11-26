@@ -99,4 +99,11 @@ describe('hooks/statusline-tap.mjs', () => {
     fs.writeFileSync(path.join(STATE, 'statusline-original.json'), JSON.stringify({ command: 'exit 3' }));
     assert.equal((await tap({ rate_limits: limits(12, 20) })).code, 0);
   });
+
+  test('元のコマンドが入力を読まずに終わっても exit 0', async () => {
+    fs.writeFileSync(path.join(STATE, 'statusline-original.json'), JSON.stringify({ command: 'exit 0' }));
+    const r = await tap({ rate_limits: limits(12, 20), padding: 'x'.repeat(200000) }); // パイプの容量を超える入力
+    assert.equal(r.code, 0);
+    assert.equal(r.stderr, '');
+  });
 });
