@@ -16,6 +16,9 @@
   --ok: #3f7d5c;
   --focus: #3c57a6;
   --mark: #f3dd8c;
+  --flap: #e2e6df;       /* 発車標の文字板 */
+  --aged: #ecd6a4;       /* 待たせて焼けた紙 */
+  --scorch: #9a5b16;     /* 焼けた縁 */
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -24,6 +27,7 @@
     --ink: #e3e8e2; --ink-2: #aeb8b4; --ink-3: #7f8a87; --rule: #34403f;
     --call: #ef6a55; --call-soft: #4a2723; --turn: #f0b23c; --turn-soft: #45391f;
     --work: #8ea4ec; --work-soft: #28324d; --rest: #6e7a76; --ok: #6fbf92; --focus: #8ea4ec; --mark: #5e4f1c;
+    --flap: #1a2225; --aged: #4a3b1d; --scorch: #e08a2e;
     color-scheme: dark;
   }
 }
@@ -32,6 +36,7 @@
   --ink: #e3e8e2; --ink-2: #aeb8b4; --ink-3: #7f8a87; --rule: #34403f;
   --call: #ef6a55; --call-soft: #4a2723; --turn: #f0b23c; --turn-soft: #45391f;
   --work: #8ea4ec; --work-soft: #28324d; --rest: #6e7a76; --ok: #6fbf92; --focus: #8ea4ec; --mark: #5e4f1c;
+    --flap: #1a2225; --aged: #4a3b1d; --scorch: #e08a2e;
   color-scheme: dark;
 }
 
@@ -194,15 +199,20 @@ main { padding: 8px 32px 48px; }
   grid-template-columns: 1fr auto;
   gap: 4px 16px;
   padding: 16px 18px 14px 22px;
-  background: var(--surface);
+  background: var(--paper, var(--surface));
   border-radius: 4px;
   border: 1px solid var(--rule);
+}
+/* 待たせている伝票は紙が焼けていく（--age: 0〜1） */
+.ticket.aged {
+  --paper: color-mix(in oklab, var(--surface), var(--aged) calc(var(--age) * 100%));
+  box-shadow: inset 0 0 calc(4px + var(--age) * 26px) color-mix(in oklab, var(--scorch) calc(var(--age) * 42%), transparent);
 }
 .ticket::before {
   content: ""; position: absolute; left: -1px; top: -1px; bottom: -1px; width: 6px;
   border-radius: 4px 0 0 4px; background: var(--bar, var(--rest));
 }
-.ticket[data-state="waiting"], .ticket[data-state="stalled"] { --bar: var(--call); background: linear-gradient(var(--call-soft), var(--call-soft)) top / 100% 3px no-repeat, var(--surface); }
+.ticket[data-state="waiting"], .ticket[data-state="stalled"] { --bar: var(--call); background: linear-gradient(var(--call-soft), var(--call-soft)) top / 100% 3px no-repeat, var(--paper, var(--surface)); }
 .ticket[data-state="yours"] { --bar: var(--turn); }
 .ticket[data-state="working"] { --bar: var(--work); }
 .ticket[data-state="idle"] { --bar: var(--rest); }
@@ -222,6 +232,38 @@ main { padding: 8px 32px 48px; }
 .ticket[data-state="yours"] .clock .state { color: var(--turn); }
 .ticket[data-state="working"] .clock { color: var(--work); }
 .ticket.compact .clock .elapsed { font-size: 26px; }
+/* 発車標: 変わった桁だけがめくれる */
+.flap {
+  display: inline-block; position: relative; min-width: .64em; padding: .06em .04em .02em; margin-left: .06em;
+  text-align: center; background: var(--flap); border-radius: .1em; line-height: 1;
+}
+.flap::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--paper, var(--surface)); opacity: .8; }
+.flap.flip { animation: flap .5s cubic-bezier(.25, 1.5, .5, 1) both; transform-origin: 50% 50%; }
+@keyframes flap {
+  0% { transform: perspective(240px) rotateX(-92deg); filter: brightness(.7); }
+  100% { transform: perspective(240px) rotateX(0); filter: none; }
+}
+
+/* 心電図: 直近10分の動き。右端が今 */
+.ecg { grid-column: 1 / -1; position: relative; margin-top: 10px; height: 26px; }
+.ecg svg { display: block; width: 100%; height: 26px; overflow: visible; }
+.ecg path { fill: none; stroke: var(--work); stroke-width: 1.6; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.ecg::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, var(--rule) 0 1px, transparent 1px 10%); opacity: .45; }
+.ecg-head { position: absolute; right: -3px; top: 16px; width: 6px; height: 6px; border-radius: 50%; background: var(--work); animation: breathe 1.2s ease-in-out infinite; }
+.ticket[data-state="stalled"] .ecg path { stroke: var(--call); }
+.ticket[data-state="stalled"] .ecg-head { background: var(--call); animation: none; }
+
+/* 閉じてよい: 判子 */
+.flag.stamp {
+  display: inline-block; padding: 0 7px; border: 2px solid currentColor; outline: 1px solid currentColor; outline-offset: 1px;
+  border-radius: 3px; transform: rotate(-4deg); letter-spacing: .04em; line-height: 1.5;
+}
+.flag.stamp.pressed { animation: stamp .55s cubic-bezier(.2, .9, .3, 1.2) both; }
+@keyframes stamp {
+  0% { transform: scale(2.4) rotate(-16deg); opacity: 0; }
+  55% { transform: scale(.92) rotate(-3deg); opacity: 1; box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 45%, transparent); }
+  100% { transform: scale(1) rotate(-4deg); box-shadow: 0 0 0 10px transparent; }
+}
 
 .reason { grid-column: 1 / -1; margin: 8px 0 0; font-size: 14px; color: var(--ink-2); overflow-wrap: anywhere; }
 .ticket[data-state="waiting"] .reason, .ticket[data-state="stalled"] .reason { color: var(--call); font-weight: 500; }
@@ -259,7 +301,7 @@ main { padding: 8px 32px 48px; }
 @keyframes breathe { 50% { opacity: .25; } }
 .ticket.fresh { animation: ring 1.6s ease-out 1; }
 @keyframes ring { 0% { box-shadow: 0 0 0 0 var(--bar); } 100% { box-shadow: 0 0 0 14px transparent; } }
-@media (prefers-reduced-motion: reduce) { .pulse, .ticket.fresh { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .pulse, .ticket.fresh, .flap.flip, .flag.stamp.pressed, .ecg-head { animation: none; } }
 
 /* ---------- 行の一覧（寝かせ・台帳・履歴） ---------- */
 .rows { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
@@ -361,7 +403,83 @@ dialog.detail::backdrop { background: rgb(20 28 30 / .35); }
 }
 .toast.show { opacity: 1; }
 
+/* ---------- つながり（ファイルの星座図） ---------- */
+.map-wrap { position: relative; margin-top: 14px; background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+#map-canvas { display: block; width: 100%; height: min(68vh, 640px); cursor: grab; touch-action: none; }
+.map-tip {
+  position: absolute; pointer-events: none; max-width: 340px; padding: 6px 10px; font-size: 13px;
+  background: var(--ink); color: var(--bg); border-radius: 4px; overflow-wrap: anywhere;
+}
+#map-side { margin-top: 18px; display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+#map-side h3 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+.clash { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--rule); font-size: 14px; }
+.clash li { padding: 8px 2px; border-bottom: 1px solid var(--rule); }
+.clash .c-file { font-weight: 600; color: var(--call); overflow-wrap: anywhere; }
+.clash .c-who { color: var(--ink-2); font-size: 13px; }
+.map-key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-2); margin: 0; padding: 0; list-style: none; }
+.map-key i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+
+/* ---------- ふりかえり ---------- */
+.rv-sec { margin-top: 28px; }
+.rv-sec > h2 { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 0 0 12px; font-size: 17px; font-weight: 600; }
+.rv-sec > h2 span { color: var(--ink-3); font-size: 13px; font-weight: 500; }
+.gantt { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 14px 6px; }
+.gantt svg { display: block; width: 100%; height: auto; }
+.gantt svg text { fill: var(--ink-3); font-size: 11px; font-family: inherit; }
+.gantt svg .g-name { fill: var(--ink-2); font-size: 12px; cursor: pointer; }
+.gantt svg .g-name:hover { fill: var(--ink); text-decoration: underline; }
+.gantt svg .grid { stroke: var(--rule); stroke-width: 1; }
+.gantt svg .now { stroke: var(--call); stroke-width: 1.5; }
+.gantt svg .w { fill: var(--work); }
+.gantt svg .t { fill: var(--turn); opacity: .55; }
+.gantt svg .conc { fill: var(--work); opacity: .3; }
+.wrap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.wcard { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 14px 16px; min-width: 0; }
+.wcard h3 { margin: 0; font-size: 13.5px; font-weight: 500; color: var(--ink-2); }
+.wcard .big { margin: 4px 0 0; font-size: 36px; font-weight: 600; line-height: 1.1; letter-spacing: -0.02em; }
+.wcard .big small { font-size: 15px; font-weight: 500; margin-left: 3px; }
+.wcard p { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); overflow-wrap: anywhere; }
+.wcard.wide { grid-column: 1 / -1; }
+.wcard.wide .heat { max-width: 760px; }
+.bars { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 5px; font-size: 13px; }
+.bars li { display: grid; grid-template-columns: minmax(0, 8.5em) 1fr 3em; gap: 8px; align-items: center; }
+.bars li span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bars li i { display: block; height: 8px; border-radius: 2px; background: var(--work); min-width: 2px; }
+.bars li b { font-weight: 600; text-align: right; }
+.heat { display: grid; grid-template-columns: 2.2em repeat(24, minmax(0, 1fr)); gap: 2px; margin-top: 10px; font-size: 11px; color: var(--ink-3); }
+.heat i { display: block; aspect-ratio: 1; border-radius: 2px; background: color-mix(in oklab, var(--work) calc(var(--v) * 100%), var(--surface-2)); }
+.heat span { text-align: center; }
+.heat .hl { text-align: left; }
+
+/* ---------- 眺めるモード ----------
+   宇宙を窓から眺める画面なので、ライトとダークのどちらでも暗い。色はこの中だけで定義する */
+.ambient {
+  --hud: #e9edf3; --hud-2: #aab4c3; --hud-3: #6f7a8b;
+  --beacon-call: #ff7a63; --beacon-turn: #ffc04d; --beacon-work: #8fb0ff; --beacon-rest: #7d8794;
+  position: fixed; inset: 0; z-index: 20; background: #03060c; color: var(--hud);
+}
+body:has(.ambient:not([hidden])) { overflow: hidden; }
+.ambient canvas { display: block; width: 100%; height: 100%; }
+.amb-hud { position: absolute; left: 32px; top: 24px; pointer-events: none; text-shadow: 0 1px 14px rgb(0 0 0 / .7); }
+.amb-clock { margin: 0; font-size: clamp(40px, 7vw, 88px); font-weight: 600; line-height: 1; letter-spacing: -0.03em; }
+.amb-verdict { margin: 10px 0 0; font-size: clamp(16px, 2vw, 22px); font-weight: 600; color: var(--hud-2); }
+.amb-verdict[data-tone="call"] { color: var(--beacon-call); }
+.amb-legend { margin: 14px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--hud-3); }
+.amb-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; box-shadow: 0 0 6px currentColor; }
+.ambient .amb-close {
+  position: absolute; right: 24px; top: 24px;
+  background: rgb(255 255 255 / .06); border-color: rgb(255 255 255 / .18); color: var(--hud-2);
+  backdrop-filter: blur(6px);
+}
+.ambient .amb-close:hover { color: var(--hud); border-color: rgb(255 255 255 / .35); }
+.ambient :focus-visible { outline-color: var(--beacon-work); }
+
 @media (max-width: 720px) {
+  .views { gap: 18px; overflow-x: auto; }
+  .views a { white-space: nowrap; }
+  .wcard.wide { grid-column: auto; }
+  .amb-hud { left: 16px; top: 16px; }
+  .ambient .amb-close { right: 16px; top: 16px; }
   .top { grid-template-columns: 1fr; padding: 20px 16px 0; }
   .controls { justify-content: flex-start; }
   main { padding: 4px 16px 40px; }

@@ -103,6 +103,14 @@ describe('TranscriptIndex', () => {
     assert.deepEqual(s.skills, ['demo-skill']);
     assert.equal(s.pendingTool, null); // 新しい依頼で保留中のツールは消える
 
+    // 心電図用の動き（依頼・ツール・返答）と、最後に編集した順のファイル
+    assert.deepEqual(s.beats.map(b => b[1]), ['p', 't', 't', 't', 't', 'r', 'p']);
+    assert.equal(s.beats[0][0], T0);
+    assert.deepEqual(s.recentFiles, [
+      { path: '/tmp/proj/b.txt', edits: 1, at: T0 + 4000 },
+      { path: '/tmp/proj/a.txt', edits: 2, at: T0 + 3000 },
+    ]);
+
     const d = detail(acc);
     assert.deepEqual(d.files[0], { path: '/tmp/proj/a.txt', edits: 2 });
     assert.deepEqual(d.timeline.map(t => t.kind), ['prompt', 'tool', 'tool', 'tool', 'tool', 'reply', 'prompt']);

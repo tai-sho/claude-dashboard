@@ -21,6 +21,7 @@
   </div>
   <div class="controls">
     <span class="live" id="live">接続中</span>
+    <button class="ctl" id="ambient-open" title="セッションを惑星と衛星で眺める画面。呼ばれたら盤面に戻ります">眺める</button>
     <button class="ctl" id="sound" aria-pressed="false">音を鳴らす</button>
     <button class="ctl" id="notify" aria-pressed="false">通知を許可</button>
   </div>
@@ -29,6 +30,8 @@
     <a href="#ledger" data-view="ledger">引き継ぎ台帳</a>
     <a href="#history" data-view="history">履歴と検索</a>
     <a href="#usage" data-view="usage">使用枠</a>
+    <a href="#map" data-view="map">つながり</a>
+    <a href="#review" data-view="review">ふりかえり</a>
   </nav>
 </header>
 <div id="hint"></div>
@@ -72,6 +75,19 @@
     </section>
   </div>
 
+  <div id="view-map" hidden>
+    <section class="lane" aria-labelledby="h-map">
+      <h2 id="h-map">つながり</h2>
+      <p class="lane-empty">稼働中のセッションと、最近編集したファイルの関係です。同じリポジトリの同じファイルを複数のセッションが編集していると、赤い線で結びます。</p>
+      <div class="map-wrap"><canvas id="map-canvas" role="img" aria-label="セッションと編集したファイルの関係図"></canvas><div class="map-tip" id="map-tip" hidden></div></div>
+      <div id="map-side"></div>
+    </section>
+  </div>
+
+  <div id="view-review" hidden>
+    <div id="review-body"></div>
+  </div>
+
   <div id="view-history" hidden>
     <div class="searchbar">
       <input type="search" id="q" placeholder="依頼・返答・引き継ぎ文から探す（空白区切りで AND）" aria-label="会話を検索">
@@ -91,7 +107,20 @@
   <div class="d-body" id="d-body"></div>
 </dialog>
 
+<div class="ambient" id="ambient" hidden>
+  <canvas id="ambient-canvas" aria-hidden="true"></canvas>
+  <div class="amb-hud">
+    <p class="amb-clock num" id="amb-clock"></p>
+    <p class="amb-verdict" id="amb-verdict"></p>
+    <ul class="amb-legend" id="amb-legend"></ul>
+  </div>
+  <button class="ctl amb-close" id="ambient-close">盤面に戻る</button>
+</div>
+
 <div class="toast" id="toast" role="status"></div>
+<script src="viz-map.js"></script>
+<script src="viz-review.js"></script>
+<script src="viz-orbit.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

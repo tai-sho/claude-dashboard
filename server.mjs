@@ -6,6 +6,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TranscriptIndex, summarize, detail } from './lib/transcripts.mjs';
+import { segmentsOf, peakConcurrency, weekStats } from './lib/review.mjs';
 import { collectSessions, SESSIONS_DIR, PROJECTS_DIR, HOOK_EVENTS_DIR, STATE_DIR, CLAUDE_DIR, projectLabel, hostIdFor, appSessionFor, loadAppSessions, gitStatus } from './lib/sessions.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -164,6 +165,28 @@ async function apiSession(url) {
   return { ...historyItem(a, live), timeline: d.timeline, files: d.files, git: live?.git ?? await gitStatus(a.cwd), recentTools: d.recentTools, model: d.model };
 }
 
+// ---------- ふりかえり ----------
+// from: 今日の始まり（画面側の時刻で 0 時）。days: 週のまとめの日数
+function apiReview(url) {
+  const now = Date.now();
+  const from = Number(url.searchParams.get('from')) || now - 86400000;
+  const days = Math.min(30, Math.max(1, Number(url.searchParams.get('days') || 7)));
+  const weekFrom = from - (days - 1) * 86400000;
+  const live = liveById();
+  const items = index.all()
+    .filter(a => !isNoise(a) && a.promptCount > 0 && a.lastActivityAt >= weekFrom)
+    .map(a => {
+      const l = live.get(a.sessionId);
+      const h = historyItem(a, l);
+      return { sessionId: a.sessionId, name: h.name, project: h.project, timeline: a.timeline, live: l?.state?.key || null };
+    });
+  const today = items
+    .map(it => ({ sessionId: it.sessionId, name: it.name, project: it.project, live: !!it.live, segs: segmentsOf(it.timeline, { from, to: now, live: it.live }) }))
+    .filter(r => r.segs.length)
+    .sort((a, b) => a.segs[0][0] - b.segs[0][0]);
+  return { from, now, today, todayPeak: peakConcurrency(today.map(r => r.segs)), week: weekStats(items, { from: weekFrom, to: now }) };
+}
+
 // ---------- HTTP ----------
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 const sendJson = (res, body, code = 200) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
@@ -190,6 +213,7 @@ const server = http.createServer(async (req, res) => {
       case '/api/usage': return sendJson(res, await apiUsage(url));
       case '/api/ledger': return sendJson(res, { index: indexStatus, sessions: apiLedger() });
       case '/api/search': return sendJson(res, { index: indexStatus, sessions: apiSearch(url) });
+      case '/api/review': return sendJson(res, { index: indexStatus, ...apiReview(url) });
       case '/api/session': {
         const s = await apiSession(url);
         return s ? sendJson(res, s) : sendJson(res, { error: 'not found' }, 404);
