@@ -456,6 +456,8 @@ dialog.detail::backdrop { background: rgb(20 28 30 / .35); }
 .ambient {
   --hud: #e9edf3; --hud-2: #aab4c3; --hud-3: #6f7a8b;
   --beacon-call: #ff7a63; --beacon-turn: #ffc04d; --beacon-work: #8fb0ff; --beacon-rest: #7d8794;
+  --hud-panel: rgb(6 11 22 / .8); --hud-line: rgb(255 255 255 / .14); --hud-line-soft: rgb(255 255 255 / .08);
+  --hud-fill: rgb(255 255 255 / .08); --hud-fill-hover: rgb(255 255 255 / .14); --hud-shade: rgb(0 0 0 / .45);
   position: fixed; inset: 0; z-index: 20; background: #03060c; color: var(--hud);
 }
 body:has(.ambient:not([hidden])) { overflow: hidden; }
@@ -481,8 +483,8 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
   position: absolute; left: 50%; bottom: 56px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 48px);
   display: flex; align-items: center; gap: 14px; padding: 10px 14px 10px 16px;
   border: 1px solid color-mix(in oklab, var(--tone) 55%, transparent); border-radius: 999px;
-  background: rgb(6 11 22 / .82); backdrop-filter: blur(10px); color: var(--hud);
-  box-shadow: 0 0 0 1px rgb(0 0 0 / .3), 0 10px 32px rgb(0 0 0 / .45);
+  background: var(--hud-panel); backdrop-filter: blur(10px); color: var(--hud);
+  box-shadow: 0 10px 32px var(--hud-shade);
 }
 .amb-call[data-tone="turn"] { --tone: var(--beacon-turn); }
 .amb-call i { width: 9px; height: 9px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 10px var(--tone); flex: none; }
@@ -490,8 +492,8 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
 .amb-call b { font-weight: 600; overflow-wrap: anywhere; }
 .amb-call p span { color: var(--tone); font-size: 13px; font-weight: 600; }
 .amb-call .amb-call-more { color: var(--hud-3); font-weight: 400; }
-.amb-call .ctl { background: rgb(255 255 255 / .08); border-color: color-mix(in oklab, var(--tone) 60%, transparent); color: var(--hud); white-space: nowrap; }
-.amb-call .ctl:hover { background: rgb(255 255 255 / .14); }
+.amb-call .ctl { background: var(--hud-fill); border-color: color-mix(in oklab, var(--tone) 60%, transparent); color: var(--hud); white-space: nowrap; }
+.amb-call .ctl:hover { background: var(--hud-fill-hover); }
 @media (prefers-reduced-motion: no-preference) {
   .amb-call:not([hidden]) i { animation: amb-call-beat 1.6s ease-in-out infinite; }
 }
@@ -502,9 +504,9 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
 .amb-card {
   --tone: var(--hud-2);
   position: absolute; right: 24px; top: 76px; width: min(360px, calc(100vw - 48px)); max-height: calc(100% - 128px); overflow: auto;
-  padding: 16px 20px 18px; border: 1px solid rgb(255 255 255 / .14); border-radius: 4px;
-  background: rgb(6 11 22 / .78); backdrop-filter: blur(10px); color: var(--hud);
-  box-shadow: 0 18px 48px rgb(0 0 0 / .45);
+  padding: 16px 20px 18px; border: 1px solid var(--hud-line); border-radius: 4px;
+  background: var(--hud-panel); backdrop-filter: blur(10px); color: var(--hud);
+  box-shadow: 0 18px 48px var(--hud-shade);
 }
 .amb-card [data-tone="call"] { --tone: var(--beacon-call); }
 .amb-card [data-tone="turn"] { --tone: var(--beacon-turn); }
@@ -512,7 +514,7 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
 .amb-card [data-tone="rest"] { --tone: var(--beacon-rest); }
 .ac-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .ac-crumb, .ac-x { border: 0; background: none; padding: 2px 0; cursor: pointer; font: inherit; font-size: 13px; color: var(--hud-3); }
-.ac-crumb { text-decoration: underline; text-decoration-color: rgb(255 255 255 / .2); text-underline-offset: 3px; overflow-wrap: anywhere; text-align: left; }
+.ac-crumb { text-decoration: underline; text-decoration-color: var(--hud-line); text-underline-offset: 3px; overflow-wrap: anywhere; text-align: left; }
 .ac-crumb:hover, .ac-x:hover { color: var(--hud); }
 .ac-count { font-size: 13px; color: var(--hud-3); }
 .ac-name { margin: 0; font-size: 19px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
@@ -523,18 +525,18 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
 .ac-tools li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ac-tools b { color: var(--beacon-work); font-weight: 600; margin-right: 8px; }
 .ac-say { margin: 14px 0 0; display: grid; gap: 10px; }
-.ac-say div { border-left: 2px solid rgb(255 255 255 / .14); padding-left: 10px; }
+.ac-say div { border-left: 2px solid var(--hud-line); padding-left: 10px; }
 .ac-say dt { font-size: 12px; color: var(--hud-3); }
 .ac-say dd { margin: 2px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--hud); white-space: pre-line; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; }
-.ac-actions { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgb(255 255 255 / .1); font-size: 13.5px; }
-.amb-card .act { color: var(--hud-2); text-decoration-color: rgb(255 255 255 / .25); }
+.ac-actions { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--hud-line-soft); font-size: 13.5px; }
+.amb-card .act { color: var(--hud-2); text-decoration-color: var(--hud-line); }
 .amb-card .act:hover { color: var(--hud); text-decoration-color: currentColor; }
 .amb-card .act.primary { color: var(--hud); text-decoration-color: var(--beacon-turn); }
 .ac-list { margin: 10px 0 0; padding: 0; list-style: none; display: grid; }
 .ac-list button {
   width: 100%; display: grid; grid-template-columns: 9px 1fr; column-gap: 10px; align-items: baseline; text-align: left;
-  border: 0; border-top: 1px solid rgb(255 255 255 / .08); background: none; padding: 9px 0; cursor: pointer; color: var(--hud); font: inherit;
+  border: 0; border-top: 1px solid var(--hud-line-soft); background: none; padding: 9px 0; cursor: pointer; color: var(--hud); font: inherit;
 }
 .ac-list button::before { content: ""; grid-row: span 2; width: 8px; height: 8px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 8px var(--tone); align-self: center; }
 .ac-list button:hover .ac-l-name { text-decoration: underline; text-underline-offset: 3px; }
@@ -548,7 +550,8 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
   .amb-hud { left: 16px; top: 16px; }
   .ambient .amb-close { right: 16px; top: 16px; }
   .amb-help { display: none; }
-  .amb-call { left: 16px; right: 16px; bottom: auto; top: 140px; transform: none; width: auto; max-width: none; border-radius: 12px; flex-wrap: wrap; }
+  .amb-call { left: 16px; right: 16px; bottom: 16px; transform: none; width: auto; max-width: none; border-radius: 12px; flex-wrap: wrap; }
+  .ambient:has(.amb-card:not([hidden])) .amb-call { bottom: calc(46% + 28px); } /* 観測カードは下に出るので、その上に置く */
   .amb-card { left: 16px; right: 16px; top: auto; bottom: 16px; width: auto; max-height: 46%; }
   .top { grid-template-columns: 1fr; padding: 20px 16px 0; }
   .controls { justify-content: flex-start; }

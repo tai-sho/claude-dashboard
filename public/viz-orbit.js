@@ -478,8 +478,11 @@ void main() {
   float zc = texture(uDepthTex, vUv).r, cc = coc(zc);
   vec3 acc = texture(uColor, vUv).rgb; float ws = 1.0;
   if (uMaxCoc > 0.5) {
+    // 標本の数はぼけの大きさに合わせる（軽くぼかすだけのときは少なく）
+    int n = int(clamp(uMaxCoc * 1.5, 8.0, 32.0));
     for (int i = 0; i < 32; i++) {
-      float r = sqrt((float(i) + 0.5) / 32.0) * uMaxCoc, a = float(i) * 2.39996;
+      if (i >= n) break;
+      float r = sqrt((float(i) + 0.5) / float(n)) * uMaxCoc, a = float(i) * 2.39996;
       vec2 uv = (px + vec2(cos(a), sin(a)) * r) / uRes;
       float z = texture(uDepthTex, uv).r, ci = coc(z);
       if (z > zc) ci = min(ci, cc); // 奥のぼけが手前にかぶらないように
@@ -814,7 +817,7 @@ void main() {
       if (!q) continue;
       if (!((lane === 'you' && dk === 1) || hoverSat === sat || (fp === sat.planet && focus.kind === 'planet'))) continue;
       // 手前の惑星に隠れている衛星の名前は出さない
-      if (planets.some(p => p.q && p.q.z < q.z && Math.hypot(p.q.x - q.x, p.q.y - q.y) < p.r * p.q.k)) continue;
+      if (hidden(q)) continue;
       const r = clamp((lane === 'you' ? 4.2 : 3) * q.k * 1.4, 1.8, 9);
       // 惑星より左にいるときは名前を左側に出し、同じ惑星の衛星どうしで重なりにくくする
       const left = sat.planet.q && q.x < sat.planet.q.x;
@@ -920,7 +923,7 @@ void main() {
     // 並びは状態と名前で決める（時刻で並べると更新のたびに入れ替わり、押そうとした行がずれる）
     const list = sats.filter(x => x.planet === p).sort((a, b) => order[TONE(a.s)] - order[TONE(b.s)] || a.s.name.localeCompare(b.s.name, 'ja'));
     return `
-      <div class="ac-top"><span class="ac-count num">${list.length}件のセッション</span>
+      <div class="ac-top"><span class="ac-count num">${esc(list.length)}件のセッション</span>
         <button class="ac-x" data-unfocus aria-label="観測をやめる">閉じる</button></div>
       <h2 class="ac-name">${esc(p.name)}</h2>
       <ul class="ac-list">${list.map(x => `<li><button data-sat="${esc(x.id)}" data-tone="${TONE(x.s)}">
@@ -958,7 +961,7 @@ void main() {
     const s = note && CB.getData()?.sessions.find(x => x.sessionId === note.id);
     const stale = !s || laneOf(s) !== 'you' || Date.now() - note.at > 90000 || (focus?.kind === 'sat' && focus.key === note.id);
     if (stale) { note = null; if (!box.hidden) { box.hidden = true; box.innerHTML = noteHtml = ''; } return; }
-    const { esc } = CB, more = note.more ? `<span class="amb-call-more">ほか${note.more}件</span>` : '';
+    const { esc } = CB, more = note.more ? `<span class="amb-call-more">ほか${esc(note.more)}件</span>` : '';
     const html = `<i aria-hidden="true"></i><p><b>${esc(s.name)}</b><span>${esc(s.state.label)}</span>${more}</p>
       <button class="ctl" data-sat="${esc(s.sessionId)}">近くで見る</button><button class="ac-x" data-dismiss aria-label="知らせを閉じる">閉じる</button>`;
     box.dataset.tone = TONE(s);
@@ -968,10 +971,12 @@ void main() {
 
   // ---------- 操作 ----------
   function pointer(ev) { const r = canvas.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; }
+  // 手前の惑星に隠れているか（名前を出すかと、押せるかの判定に使う）
+  const hidden = q => planets.some(p => p.q && p.q.z < q.z && Math.hypot(p.q.x - q.x, p.q.y - q.y) < p.r * p.q.k);
   function pickSat(ev) {
     const [mx, my] = pointer(ev);
     let best = null, bd = 22;
-    for (const sat of sats) { if (!sat.q) continue; const d = Math.hypot(sat.q.x - mx, sat.q.y - my); if (d < bd) { bd = d; best = sat; } }
+    for (const sat of sats) { if (!sat.q || hidden(sat.q)) continue; const d = Math.hypot(sat.q.x - mx, sat.q.y - my); if (d < bd) { bd = d; best = sat; } }
     return best;
   }
   function pickPlanet(ev) {
@@ -1007,15 +1012,26 @@ void main() {
         if (e.key === 'Escape') { if (focus) setFocus(null); else api.close(); return; }
         const k = { '+': () => zoomBy(1 / 1.25), '=': () => zoomBy(1 / 1.25), '-': () => zoomBy(1.25),
           ArrowLeft: () => turn(.12, 0), ArrowRight: () => turn(-.12, 0), ArrowUp: () => turn(0, -.08), ArrowDown: () => turn(0, .08) }[e.key];
-        if (k && !e.target.closest?.('button, a')) { e.preventDefault(); k(); }
+        // カードや知らせの中ではスクロールなどに矢印キーを使うので取らない（閉じるボタンにいるときは取る）
+        if (k && !e.target.closest?.('.amb-card, .amb-call')) { e.preventDefault(); k(); }
       });
-      // ドラッグで回す。ほとんど動かさずに離したらクリックとして扱う
+      // ドラッグで回す。ほとんど動かさずに離したらクリックとして扱う。指2本ではつまんで寄る
+      const touches = new Map();
+      const spread = () => { const [a, b] = [...touches.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
       canvas.addEventListener('pointerdown', ev => {
         if (ev.button !== 0) return;
+        touches.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+        try { canvas.setPointerCapture(ev.pointerId); } catch {} // 捕まえられなくても操作は続ける
+        if (touches.size === 2) { drag = { pinch: spread(), moved: true }; return; }
+        if (touches.size > 2) return;
         drag = { x: ev.clientX, y: ev.clientY, lx: ev.clientX, ly: ev.clientY, moved: false };
-        canvas.setPointerCapture(ev.pointerId);
       });
       canvas.addEventListener('pointermove', ev => {
+        if (touches.has(ev.pointerId)) touches.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+        if (drag?.pinch) {
+          if (touches.size === 2) { const d = spread(); if (d > 0) zoomBy(drag.pinch / d); drag.pinch = d; }
+          return;
+        }
         if (drag) {
           if (!drag.moved && Math.hypot(ev.clientX - drag.x, ev.clientY - drag.y) > 4) { drag.moved = true; hoverSat = null; canvas.style.cursor = 'grabbing'; }
           if (drag.moved) turn((ev.clientX - drag.lx) * .005, (ev.clientY - drag.ly) * .004);
@@ -1027,6 +1043,8 @@ void main() {
         redraw();
       });
       const endDrag = ev => {
+        touches.delete(ev.pointerId);
+        if (drag?.pinch) { if (!touches.size) { drag = null; canvas.style.cursor = 'grab'; } return; } // 2本とも離すまで回さない
         if (!drag) return;
         const click = !drag.moved && ev.type === 'pointerup';
         drag = null; canvas.style.cursor = 'grab';
@@ -1077,6 +1095,9 @@ void main() {
       if (!open) return;
       open = false; el.hidden = true; clearInterval(clockTimer);
       focus = null; drag = null; note = null; renderCard(); renderNote();
+      // 画面いっぱいの描画先は大きいので、閉じたら手放す（次に開いたときに作り直す）
+      if (fbo && gl && !gl.isContextLost()) { gl.deleteFramebuffer(fbo.fb); gl.deleteTexture(fbo.color); gl.deleteTexture(fbo.depth); }
+      fbo = null;
       CB.$('ambient-open').focus();
     },
     update(d) { if (open) { build(d); renderCard(); hud(); kick(); } },
