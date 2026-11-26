@@ -21,7 +21,7 @@
   </div>
   <div class="controls">
     <span class="live" id="live">接続中</span>
-    <button class="ctl" id="ambient-open" title="セッションを惑星と衛星で眺める画面。呼ばれたら盤面に戻ります">眺める</button>
+    <button class="ctl" id="ambient-open" title="セッションを惑星と衛星で眺める画面">眺める</button>
     <button class="ctl" id="sound" aria-pressed="false">音を鳴らす</button>
     <button class="ctl" id="notify" aria-pressed="false">通知を許可</button>
   </div>
@@ -109,11 +109,15 @@
 
 <div class="ambient" id="ambient" hidden>
   <canvas id="ambient-canvas" aria-hidden="true"></canvas>
+  <canvas id="ambient-overlay" aria-hidden="true"></canvas>
   <div class="amb-hud">
     <p class="amb-clock num" id="amb-clock"></p>
     <p class="amb-verdict" id="amb-verdict"></p>
     <ul class="amb-legend" id="amb-legend"></ul>
   </div>
+  <aside class="amb-card" id="amb-card" aria-label="観測中の天体" hidden></aside>
+  <div class="amb-call" id="amb-call" role="status" hidden></div>
+  <p class="amb-help">ドラッグで回す　ホイールで寄る　惑星や衛星を押すと近くで見られます</p>
   <button class="ctl amb-close" id="ambient-close">盤面に戻る</button>
 </div>
 

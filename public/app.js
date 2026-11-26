@@ -277,7 +277,7 @@
     if (prevStates) {
       const called = data.sessions.filter(s => now[s.sessionId] !== 'other' && prevStates[s.sessionId] !== now[s.sessionId]);
       for (const s of called) fresh.add(s.sessionId);
-      if (called.length) { alertUser(called); CB.ambient?.close(); } // 眺めている最中に呼ばれたら盤面に戻す
+      if (called.length) { alertUser(called); CB.ambient?.notify?.(called); } // 眺めている最中は閉じずに、宇宙の画面の中で知らせる
     }
     prevStates = now;
     const closable = new Map(data.sessions.map(s => [s.sessionId, s.closable]));
@@ -551,7 +551,7 @@
 
   // ---------- 別ファイルの画面に渡す道具 ----------
   const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  Object.assign(CB, { $, esc, ago, hhmm, dayKey, dayLabel, elapsed, getJson, openDetail, cssVar, laneOf, since, reduceMotion, getData: () => data });
+  Object.assign(CB, { $, esc, plain, where, openActions, ago, hhmm, dayKey, dayLabel, elapsed, getJson, openDetail, cssVar, laneOf, since, reduceMotion, getData: () => data });
   for (const v of Object.values(CB.views)) v.init?.(CB);
   CB.ambient?.init?.(CB);
 

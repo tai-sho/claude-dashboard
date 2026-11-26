@@ -456,10 +456,12 @@ dialog.detail::backdrop { background: rgb(20 28 30 / .35); }
 .ambient {
   --hud: #e9edf3; --hud-2: #aab4c3; --hud-3: #6f7a8b;
   --beacon-call: #ff7a63; --beacon-turn: #ffc04d; --beacon-work: #8fb0ff; --beacon-rest: #7d8794;
+  --hud-panel: rgb(6 11 22 / .8); --hud-line: rgb(255 255 255 / .14); --hud-line-soft: rgb(255 255 255 / .08);
+  --hud-fill: rgb(255 255 255 / .08); --hud-fill-hover: rgb(255 255 255 / .14); --hud-shade: rgb(0 0 0 / .45);
   position: fixed; inset: 0; z-index: 20; background: #03060c; color: var(--hud);
 }
 body:has(.ambient:not([hidden])) { overflow: hidden; }
-.ambient canvas { display: block; width: 100%; height: 100%; }
+.ambient canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .amb-hud { position: absolute; left: 32px; top: 24px; pointer-events: none; text-shadow: 0 1px 14px rgb(0 0 0 / .7); }
 .amb-clock { margin: 0; font-size: clamp(40px, 7vw, 88px); font-weight: 600; line-height: 1; letter-spacing: -0.03em; }
 .amb-verdict { margin: 10px 0 0; font-size: clamp(16px, 2vw, 22px); font-weight: 600; color: var(--hud-2); }
@@ -473,6 +475,73 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
 }
 .ambient .amb-close:hover { color: var(--hud); border-color: rgb(255 255 255 / .35); }
 .ambient :focus-visible { outline-color: var(--beacon-work); }
+#ambient-overlay { touch-action: none; }
+
+/* 呼ばれたときの知らせ: 画面は閉じず、下に出す。押すとその衛星に寄る */
+.amb-call {
+  --tone: var(--beacon-call);
+  position: absolute; left: 50%; bottom: 56px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 48px);
+  display: flex; align-items: center; gap: 14px; padding: 10px 14px 10px 16px;
+  border: 1px solid color-mix(in oklab, var(--tone) 55%, transparent); border-radius: 999px;
+  background: var(--hud-panel); backdrop-filter: blur(10px); color: var(--hud);
+  box-shadow: 0 10px 32px var(--hud-shade);
+}
+.amb-call[data-tone="turn"] { --tone: var(--beacon-turn); }
+.amb-call i { width: 9px; height: 9px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 10px var(--tone); flex: none; }
+.amb-call p { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 14px; min-width: 0; }
+.amb-call b { font-weight: 600; overflow-wrap: anywhere; }
+.amb-call p span { color: var(--tone); font-size: 13px; font-weight: 600; }
+.amb-call .amb-call-more { color: var(--hud-3); font-weight: 400; }
+.amb-call .ctl { background: var(--hud-fill); border-color: color-mix(in oklab, var(--tone) 60%, transparent); color: var(--hud); white-space: nowrap; }
+.amb-call .ctl:hover { background: var(--hud-fill-hover); }
+@media (prefers-reduced-motion: no-preference) {
+  .amb-call:not([hidden]) i { animation: amb-call-beat 1.6s ease-in-out infinite; }
+}
+@keyframes amb-call-beat { 50% { box-shadow: 0 0 2px var(--tone); opacity: .55; } }
+.amb-help { position: absolute; left: 32px; bottom: 22px; margin: 0; font-size: 12.5px; color: var(--hud-3); pointer-events: none; text-shadow: 0 1px 8px rgb(0 0 0 / .8); }
+
+/* 観測カード: 押した天体の様子。キャンバスの線がこのカードの左上につながる */
+.amb-card {
+  --tone: var(--hud-2);
+  position: absolute; right: 24px; top: 76px; width: min(360px, calc(100vw - 48px)); max-height: calc(100% - 128px); overflow: auto;
+  padding: 16px 20px 18px; border: 1px solid var(--hud-line); border-radius: 4px;
+  background: var(--hud-panel); backdrop-filter: blur(10px); color: var(--hud);
+  box-shadow: 0 18px 48px var(--hud-shade);
+}
+.amb-card [data-tone="call"] { --tone: var(--beacon-call); }
+.amb-card [data-tone="turn"] { --tone: var(--beacon-turn); }
+.amb-card [data-tone="work"] { --tone: var(--beacon-work); }
+.amb-card [data-tone="rest"] { --tone: var(--beacon-rest); }
+.ac-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.ac-crumb, .ac-x { border: 0; background: none; padding: 2px 0; cursor: pointer; font: inherit; font-size: 13px; color: var(--hud-3); }
+.ac-crumb { text-decoration: underline; text-decoration-color: var(--hud-line); text-underline-offset: 3px; overflow-wrap: anywhere; text-align: left; }
+.ac-crumb:hover, .ac-x:hover { color: var(--hud); }
+.ac-count { font-size: 13px; color: var(--hud-3); }
+.ac-name { margin: 0; font-size: 19px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.ac-state { display: flex; align-items: baseline; gap: 10px; margin: 8px 0 0; color: var(--tone); font-weight: 600; }
+.ac-state .num { font-size: 28px; line-height: 1; letter-spacing: -0.02em; }
+.ac-where, .ac-reason { margin: 6px 0 0; font-size: 13px; color: var(--hud-2); overflow-wrap: anywhere; }
+.ac-tools { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 12.5px; color: var(--hud-2); }
+.ac-tools li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-tools b { color: var(--beacon-work); font-weight: 600; margin-right: 8px; }
+.ac-say { margin: 14px 0 0; display: grid; gap: 10px; }
+.ac-say div { border-left: 2px solid var(--hud-line); padding-left: 10px; }
+.ac-say dt { font-size: 12px; color: var(--hud-3); }
+.ac-say dd { margin: 2px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--hud); white-space: pre-line; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; }
+.ac-actions { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--hud-line-soft); font-size: 13.5px; }
+.amb-card .act { color: var(--hud-2); text-decoration-color: var(--hud-line); }
+.amb-card .act:hover { color: var(--hud); text-decoration-color: currentColor; }
+.amb-card .act.primary { color: var(--hud); text-decoration-color: var(--beacon-turn); }
+.ac-list { margin: 10px 0 0; padding: 0; list-style: none; display: grid; }
+.ac-list button {
+  width: 100%; display: grid; grid-template-columns: 9px 1fr; column-gap: 10px; align-items: baseline; text-align: left;
+  border: 0; border-top: 1px solid var(--hud-line-soft); background: none; padding: 9px 0; cursor: pointer; color: var(--hud); font: inherit;
+}
+.ac-list button::before { content: ""; grid-row: span 2; width: 8px; height: 8px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 8px var(--tone); align-self: center; }
+.ac-list button:hover .ac-l-name { text-decoration: underline; text-underline-offset: 3px; }
+.ac-l-name { font-size: 14px; overflow-wrap: anywhere; }
+.ac-l-state { font-size: 12.5px; color: var(--tone); }
 
 @media (max-width: 720px) {
   .views { gap: 18px; overflow-x: auto; overflow-y: hidden; }
@@ -480,6 +549,10 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
   .wcard.wide { grid-column: auto; }
   .amb-hud { left: 16px; top: 16px; }
   .ambient .amb-close { right: 16px; top: 16px; }
+  .amb-help { display: none; }
+  .amb-call { left: 16px; right: 16px; bottom: 16px; transform: none; width: auto; max-width: none; border-radius: 12px; flex-wrap: wrap; }
+  .ambient:has(.amb-card:not([hidden])) .amb-call { bottom: calc(46% + 28px); } /* 観測カードは下に出るので、その上に置く */
+  .amb-card { left: 16px; right: 16px; top: auto; bottom: 16px; width: auto; max-height: 46%; }
   .top { grid-template-columns: 1fr; padding: 20px 16px 0; }
   .controls { justify-content: flex-start; }
   main { padding: 4px 16px 40px; }
