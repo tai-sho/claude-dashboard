@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude 呼び出し盤</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#e3e7e1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1 class="verdict" id="verdict" data-tone="calm">読み込み中</h1>
+    <p class="tally" id="tally"></p>
+    <div class="meters" id="meters" hidden></div>
+  </div>
+  <div class="controls">
+    <span class="live" id="live">接続中</span>
+    <button class="ctl" id="sound" aria-pressed="false">音を鳴らす</button>
+    <button class="ctl" id="notify" aria-pressed="false">通知を許可</button>
+  </div>
+  <nav class="views" aria-label="画面">
+    <a href="#board" data-view="board">呼び出し盤<span class="badge num" id="nav-calls"></span></a>
+    <a href="#ledger" data-view="ledger">引き継ぎ台帳</a>
+    <a href="#history" data-view="history">履歴と検索</a>
+    <a href="#usage" data-view="usage">使用枠</a>
+  </nav>
+</header>
+<div id="hint"></div>
+
+<main>
+  <div id="view-board">
+    <section class="lane" aria-labelledby="h-you">
+      <h2 id="h-you">あなたを待っている <span class="count num" id="c-you"></span></h2>
+      <div class="grid-you" id="lane-you"></div>
+    </section>
+    <section class="lane" aria-labelledby="h-work">
+      <h2 id="h-work">Claude が作業中 <span class="count num" id="c-work"></span></h2>
+      <div class="grid-work" id="lane-work"></div>
+    </section>
+    <section class="lane" aria-labelledby="h-rest">
+      <h2 id="h-rest">寝かせている <span class="count num" id="c-rest"></span></h2>
+      <ul class="rows" id="lane-rest"></ul>
+    </section>
+  </div>
+
+  <div id="view-ledger" hidden>
+    <section class="lane" aria-labelledby="h-ledger">
+      <h2 id="h-ledger">引き継ぎ台帳 <span class="count num" id="c-ledger"></span></h2>
+      <p class="lane-empty">稼働中のセッションと、この2週間に引き継ぎ文を残したセッションです。引き継ぎ文は Claude アプリが各ターンの終わりに書く要約を使っています。</p>
+      <ul class="rows ledger" id="ledger-list"></ul>
+    </section>
+  </div>
+
+  <div id="view-usage" hidden>
+    <section class="lane" aria-labelledby="h-usage">
+      <h2 id="h-usage">使用枠</h2>
+      <div id="usage-body"></div>
+    </section>
+  </div>
+
+  <div id="view-history" hidden>
+    <div class="searchbar">
+      <input type="search" id="q" placeholder="依頼・返答・引き継ぎ文から探す（空白区切りで AND）" aria-label="会話を検索">
+      <span class="meta" id="hist-meta"></span>
+    </div>
+    <div id="history-body"></div>
+  </div>
+</main>
+
+<dialog class="detail" id="detail" aria-labelledby="d-title">
+  <div class="d-head">
+    <h2 id="d-title"></h2>
+    <p id="d-where"></p>
+    <div class="actions" id="d-actions"></div>
+    <button class="d-close" id="d-close">閉じる</button>
+  </div>
+  <div class="d-body" id="d-body"></div>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>

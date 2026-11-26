@@ -1,0 +1,131 @@
+# Claude 呼び出し盤（claude-dashboard）
+
+Claude Code のセッションを何本も並べて動かしていると、「どれが承認を待っているか」「どれが返事を待っているか」「どれを閉じてよいか」を追いきれなくなります。このダッシュボードは、手元の Claude Code の記録を読んで、いま誰があなたを待っているかを一画面にまとめます。
+
+A local dashboard that shows which of your parallel Claude Code sessions are waiting for you. It reads Claude Code's local files only, runs on Node.js built-ins with no dependencies, and serves on `127.0.0.1`. The UI is in Japanese.
+
+## 特徴
+
+- **呼び出し盤**: 稼働中のセッションを「あなたを待っている」「Claude が作業中」「寝かせている」に分け、待ち時間を大きく表示します。承認待ちや停滞は赤、あなたの番は黄色で示します。
+- **閉じてよい判定**: 承認待ちでない、作業中でない、最新の依頼に対する引き継ぎ文がある、未コミット・未プッシュの変更がない、の4条件で判定します。
+- **引き継ぎ台帳**: セッションごとの最新の引き継ぎ文を一覧にします。
+- **履歴と検索**: 終了したセッションも含めて日別に並べ、依頼・返答・引き継ぎ文を全文検索できます。
+- **詳細パネル**: 経緯のタイムライン、触ったファイル、使ったスキルを表示します。
+- **使用枠**: 5時間枠と週の枠の使用率、リセットまでの時間、このペースでの見込み、7日間の推移を表示します。
+- **通知**: あなたを待つセッションが増えたときに、音とデスクトップ通知で知らせます。
+- **Claude で開く**: Claude デスクトップアプリのセッションは、ボタン一つでアプリの該当セッションを開けます。
+
+## 動作環境
+
+- Node.js 20 以上
+- Claude Code（CLI またはデスクトップアプリ）
+- macOS を主に想定しています。Linux でも会話記録の読み取りや表示は動く見込みですが、デスクトップアプリとの連携（「Claude で開く」、アプリのセッション名）は macOS のみです。Windows は未確認です。
+
+## 使い方
+
+```bash
+git clone https://github.com/tai-sho/claude-dashboard.git
+cd claude-dashboard
+npm start
+```
+
+ブラウザで http://localhost:4317 を開きます。Chrome や Edge の「アプリとしてインストール」を使うと、独立したウィンドウとして別モニターに常時表示できます。
+
+起動時に `~/.claude/projects` の会話記録から索引を作ります。セッション数が千件程度なら数秒で終わります。
+
+サーバーを入れ替えるとき（コードを更新したときなど）は、動いているものを止めてから起動し直します。
+
+```bash
+npm restart
+```
+
+### 承認待ちの検知を有効にする（任意）
+
+Claude Code の hooks を使って、許可の確認が出たセッションを「承認待ち」として表示します。
+
+```bash
+npm run hooks:install
+```
+
+`~/.claude/settings.json` に hooks を追記します。既存の hooks はそのまま残り、元の設定はバックアップされます。新しく始めたセッションから有効になります。外すときは `npm run hooks:remove` を実行します。
+
+### 使用枠の記録を有効にする（任意）
+
+Claude Code は使用枠の使用率を statusline のコマンドにだけ渡します。そこで、statusline の前に記録用のスクリプトを挟みます。
+
+```bash
+npm run usage:install
+```
+
+元の statusline コマンドは `~/.claude-dashboard/statusline-original.json` に退避され、表示はこれまでどおり元のコマンドが行います。外すときは `npm run usage:remove` を実行します。
+
+statusline はターミナルで動かす Claude Code でのみ実行されます。デスクトップアプリだけを使っている場合、使用枠は記録されません。
+
+## 画面の見方
+
+| 状態 | 意味 |
+| --- | --- |
+| 承認待ち | hooks の Notification / PermissionRequest が、最後の会話記録より新しい |
+| 停滞 | busy のまま 3 分以上、会話記録が増えていない |
+| あなたの番 | Claude の返答で止まっている。「確認した」を押すか 8 時間たつと「寝かせている」に移る |
+| 作業中 | Claude Code が busy |
+| 待機 | 依頼のあと応答なしで止まっている |
+
+「閉じてよい」は次の4条件をすべて満たすときに表示します。詳細パネルでどの条件を満たしていないかを確認できます。
+
+1. 承認待ちではない
+2. 裏で作業していない
+3. 最新の依頼に対する引き継ぎ文がある
+4. 未コミット・未プッシュの変更がない（Git 管理外のフォルダは満たす扱い）
+
+引き継ぎ文には、Claude デスクトップアプリが各ターンの終わりに書く要約を使います。CLI だけで使っている場合、引き継ぎ文は作られないため、条件 3 は満たされません。
+
+## 読み取るデータ
+
+すべてローカルのファイルです。外部に送信するものはありません。
+
+| 情報 | 読み取り元 |
+| --- | --- |
+| 稼働中のセッション、名前、作業フォルダ、busy / idle | `~/.claude/sessions/<pid>.json` |
+| 依頼・返答・ツール・触ったファイル・スキル・引き継ぎ文 | `~/.claude/projects/<フォルダ>/<セッションID>.jsonl`（追記された分だけ読む） |
+| デスクトップアプリのセッション ID・タイトル | `~/Library/Application Support/Claude/claude-code-sessions/**/local_*.json`（macOS） |
+| 未コミット・未プッシュの変更 | 各作業フォルダで `git status` |
+| 承認待ち | hooks が書く `~/.claude-dashboard/events/<セッションID>.json` |
+| 使用枠 | statusline の入力を記録した `~/.claude-dashboard/usage.json` と `usage-history.jsonl` |
+
+ダッシュボード自身が書き込むのは `~/.claude-dashboard/` と、インストールコマンドを実行した場合の `~/.claude/settings.json` だけです。
+
+## 設定
+
+環境変数で変更できます。
+
+| 変数 | 既定値 | 内容 |
+| --- | --- | --- |
+| `PORT` | `4317` | 待ち受けるポート |
+| `CLAUDE_CONFIG_DIR` | `~/.claude` | Claude Code の設定ディレクトリ |
+| `INCLUDE_SDK` | 未設定 | `1` にすると、Agent SDK から起動された自動処理のセッションも表示する |
+
+## セキュリティとプライバシー
+
+- サーバーは `127.0.0.1` だけで待ち受け、Host ヘッダーが `localhost` / `127.0.0.1` 以外の要求は拒否します。
+- 画面には会話の内容が表示されます。画面共有やスクリーンショットの扱いに注意してください。
+- フォント（IBM Plex Sans JP）を Google Fonts から読み込みます。オフラインでも、システムフォントで表示されます。
+
+## 注意
+
+このツールは、Claude Code とデスクトップアプリが手元に書き出すファイルを読んでいます。これらの形式は公開された仕様ではないため、Claude Code の更新で表示が崩れることがあります。
+
+Anthropic とは関係のない、個人のツールです。
+
+## 構成
+
+```
+server.mjs              HTTP サーバー、変更検知、API
+lib/transcripts.mjs     会話記録（jsonl）の差分読み取りと索引
+lib/sessions.mjs        稼働中セッションの状態判定、git、アプリ連携
+hooks/record.mjs        hooks から呼ばれ、承認待ちなどのイベントを記録
+hooks/statusline-tap.mjs statusline の前に挟み、使用枠を記録
+install-hooks.mjs       hooks の登録・解除
+install-usage.mjs       statusline 記録の登録・解除
+public/                 画面（HTML / CSS / JS）
+```
