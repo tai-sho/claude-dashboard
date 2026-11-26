@@ -7,6 +7,7 @@
   const REST_AFTER_MS = 8 * 60 * 60 * 1000; // 8時間触っていない「あなたの番」は寝かせる扱い
   let acks = store.get('acks', {});
   let soundOn = store.get('sound', false);
+  let arrange = store.get('arrange', 'project') === 'state' ? 'state' : 'project'; // 盤面の並べ方
   let data = null;
   let prevStates = null;
   const fresh = new Set();
@@ -31,8 +32,9 @@
     const base = d.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' });
     return key === today ? `今日　${base}` : key === yest ? `昨日　${base}` : base;
   }
-  function where(s) {
-    const parts = [esc(s.project)];
+  // noProject: プロジェクトの見出しの下ではプロジェクト名を繰り返さない
+  function where(s, noProject) {
+    const parts = noProject ? [] : [esc(s.project)];
     if (s.gitBranch && s.gitBranch !== 'HEAD') parts.push(`<span class="branch">${esc(s.gitBranch)}</span>`);
     else if (s.worktree) parts.push(esc(s.worktree));
     return parts.join(' / ');
@@ -78,8 +80,9 @@
   }
   const since = s => s.state.since || s.lastActivityAt;
 
-  function ticket(s, big) {
+  function ticket(s, big, inProject) {
     const e = elapsed(Date.now() - since(s));
+    const place = where(s, inProject);
     const st = s.state;
     const stateText = st.key === 'working' ? `<span class="pulse" aria-hidden="true"></span>${esc(st.label)}` : esc(st.label);
     const prompt = plain(s.lastPrompt);
@@ -89,10 +92,10 @@
       ? `<ul class="tools">${s.recentTools.slice(0, big ? 3 : 2).map(t => `<li><b>${esc(t.name)}</b>${esc(t.detail)}</li>`).join('')}</ul>` : '';
     const ack = st.key === 'yours' ? `<button class="act" data-ack="${esc(s.sessionId)}">確認した</button>` : '';
     return `
-    <article class="ticket${fresh.has(s.sessionId) ? ' fresh' : ''}" data-state="${esc(st.key)}">
+    <article class="ticket${big ? '' : ' compact'}${fresh.has(s.sessionId) ? ' fresh' : ''}" data-state="${esc(st.key)}">
       <div>
         <h3 class="t-name"><button data-detail="${esc(s.sessionId)}">${esc(s.name)}</button></h3>
-        <p class="t-where">${where(s)}</p>
+        ${place ? `<p class="t-where">${place}</p>` : ''}
       </div>
       <div class="clock num" title="${esc(new Date(since(s)).toLocaleString('ja-JP'))}">
         <span class="elapsed">${e.n}<small>${e.u}</small></span>
@@ -121,13 +124,46 @@
     return gitFlag(s) || `<span class="flag">${esc(s.state?.label || '')}</span>`;
   }
 
-  function restRow(s) {
+  function restRow(s, inProject) {
     return `<li><button class="row-btn" data-detail="${esc(s.sessionId)}">
       <span class="r-name">${esc(s.name)}</span>
-      <span class="r-where">${where(s)}</span>
+      <span class="r-where">${where(s, inProject)}</span>
       <span class="r-age num">${ago(s.lastActivityAt)}</span>
       <span class="r-flag">${closeFlag(s)}</span>
     </button></li>`;
+  }
+
+  // プロジェクト別: 呼ばれている度合いの高いプロジェクトを上に。中は 待っている → 作業中 → 寝かせている
+  function renderProjects(lanes) {
+    const groups = new Map();
+    const at = key => {
+      if (!groups.has(key)) groups.set(key, { name: key, you: [], work: [], rest: [], calls: 0, last: 0 });
+      return groups.get(key);
+    };
+    for (const lane of ['you', 'work', 'rest']) {
+      for (const s of lanes[lane]) {
+        const g = at(s.project || '不明');
+        g[lane].push(s);
+        if (lane === 'you' && s.state.key !== 'yours') g.calls++;
+        g.last = Math.max(g.last, s.lastActivityAt || 0);
+      }
+    }
+    const rank = g => (g.calls ? 0 : g.you.length ? 1 : g.work.length ? 2 : 3);
+    const list = [...groups.values()].sort((a, b) => rank(a) - rank(b) || b.last - a.last);
+    if (!list.length) return '<p class="lane-empty">稼働中のセッションはありません。</p>';
+    return list.map((g, i) => {
+      const tally = [
+        g.you.length ? `<span class="pc" data-tone="${g.calls ? 'call' : 'turn'}">待っている <b class="num">${g.you.length}</b></span>` : '',
+        g.work.length ? `<span class="pc" data-tone="work">作業中 <b class="num">${g.work.length}</b></span>` : '',
+        g.rest.length ? `<span class="pc">寝かせている <b class="num">${g.rest.length}</b></span>` : '',
+      ].join('');
+      const cards = [...g.you.map(s => ticket(s, true, true)), ...g.work.map(s => ticket(s, false, true))].join('');
+      return `<section class="proj" data-rank="${rank(g)}" aria-labelledby="p-${i}">
+        <h2 id="p-${i}"><span class="p-name">${esc(g.name)}</span><span class="p-tally">${tally}</span></h2>
+        ${cards ? `<div class="grid-proj">${cards}</div>` : ''}
+        ${g.rest.length ? `<ul class="rows">${g.rest.map(s => restRow(s, true)).join('')}</ul>` : ''}
+      </section>`;
+    }).join('');
   }
 
   function renderBoard() {
@@ -137,10 +173,17 @@
     lanes.you.sort((a, b) => ((a.state.key === 'yours') - (b.state.key === 'yours')) || since(a) - since(b));
     lanes.rest.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
 
-    $('lane-you').innerHTML = lanes.you.map(s => ticket(s, true)).join('') || '<p class="lane-empty">いま、あなたの返事を待っているセッションはありません。</p>';
-    $('lane-work').innerHTML = lanes.work.map(s => ticket(s, false)).join('') || '<p class="lane-empty">作業中のセッションはありません。</p>';
-    $('lane-rest').innerHTML = lanes.rest.map(restRow).join('');
-    $('c-you').textContent = lanes.you.length; $('c-work').textContent = lanes.work.length; $('c-rest').textContent = lanes.rest.length;
+    for (const b of document.querySelectorAll('[data-arrange]')) b.setAttribute('aria-pressed', b.dataset.arrange === arrange);
+    $('board-lanes').hidden = arrange !== 'state';
+    $('board-projects').hidden = arrange !== 'project';
+    if (arrange === 'project') {
+      $('board-projects').innerHTML = renderProjects(lanes);
+    } else {
+      $('lane-you').innerHTML = lanes.you.map(s => ticket(s, true)).join('') || '<p class="lane-empty">いま、あなたの返事を待っているセッションはありません。</p>';
+      $('lane-work').innerHTML = lanes.work.map(s => ticket(s, false)).join('') || '<p class="lane-empty">作業中のセッションはありません。</p>';
+      $('lane-rest').innerHTML = lanes.rest.map(s => restRow(s)).join('');
+      $('c-you').textContent = lanes.you.length; $('c-work').textContent = lanes.work.length; $('c-rest').textContent = lanes.rest.length;
+    }
 
     const calls = lanes.you.filter(s => s.state.key !== 'yours').length;
     const turns = lanes.you.length - calls;
@@ -405,8 +448,9 @@
 
   // ---------- 操作 ----------
   document.addEventListener('click', async e => {
-    const el = e.target.closest('[data-detail],[data-ack],[data-copy],.timeline li.reply');
+    const el = e.target.closest('[data-detail],[data-ack],[data-copy],[data-arrange],.timeline li.reply');
     if (!el) return;
+    if (el.dataset.arrange) { arrange = el.dataset.arrange; store.set('arrange', arrange); renderBoard(); return; }
     if (el.dataset.detail) { openDetail(el.dataset.detail, el.dataset.q); return; }
     if (el.dataset.ack) {
       const s = data.sessions.find(x => x.sessionId === el.dataset.ack);
