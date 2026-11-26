@@ -117,6 +117,10 @@ statusline はターミナルで動かす Claude Code でのみ実行されま�
 
 Anthropic とは関係のない、個人のツールです。
 
+## ライセンス
+
+[MIT](LICENSE)
+
 ## 構成
 
 ```
