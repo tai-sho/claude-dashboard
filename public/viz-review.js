@@ -35,11 +35,11 @@
 
     const grid = [];
     for (let t = Math.ceil(from / H) * H; t <= to; t += H) {
-      grid.push(`<line class="grid" x1="${x(t)}" x2="${x(t)}" y1="${T - 36}" y2="${Hh - B}" stroke-dasharray="2 4"/>${x(t) < W - 30 ? `<text x="${x(t) + 3}" y="${Hh - 8}">${new Date(t).getHours()}時</text>` : ''}`);
+      grid.push(`<line class="grid" x1="${x(t)}" x2="${x(t)}" y1="${T - 36}" y2="${Hh - B}" stroke-dasharray="2 4"/>${x(t) < W - 30 ? `<text x="${x(t) + 3}" y="${Hh - 8}">${esc(new Date(t).getHours())}時</text>` : ''}`);
     }
     const bars = rows.map((row, i) => {
       const y = T + i * RH;
-      const segs = row.segs.map(([s, e, k]) => `<rect class="${k}" x="${x(s).toFixed(1)}" y="${y + 4}" width="${Math.max(1.5, x(e) - x(s)).toFixed(1)}" height="${RH - 8}" rx="2"><title>${k === 'w' ? '作業中' : 'あなたの番'} ${hhmm(s)}–${hhmm(e)}</title></rect>`).join('');
+      const segs = row.segs.map(([s, e, k]) => `<rect class="${esc(k)}" x="${x(s).toFixed(1)}" y="${y + 4}" width="${Math.max(1.5, x(e) - x(s)).toFixed(1)}" height="${RH - 8}" rx="2"><title>${k === 'w' ? '作業中' : 'あなたの番'} ${esc(hhmm(s))}–${esc(hhmm(e))}</title></rect>`).join('');
       return `<text class="g-name" x="${L - 10}" y="${y + RH / 2 + 4}" text-anchor="end" data-detail="${esc(row.sessionId)}">${esc(short(row.name, 18))}<title>${esc(row.name)}（${esc(row.project)}）</title></text>${segs}`;
     }).join('');
     return `<div class="gantt"><svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="今日のセッションごとの稼働帯">

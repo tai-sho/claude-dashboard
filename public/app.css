@@ -475,8 +475,8 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
 .ambient :focus-visible { outline-color: var(--beacon-work); }
 
 @media (max-width: 720px) {
-  .views { gap: 18px; overflow-x: auto; }
-  .views a { white-space: nowrap; }
+  .views { gap: 18px; overflow-x: auto; overflow-y: hidden; }
+  .views a { white-space: nowrap; margin-bottom: 0; }
   .wcard.wide { grid-column: auto; }
   .amb-hud { left: 16px; top: 16px; }
   .ambient .amb-close { right: 16px; top: 16px; }

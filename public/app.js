@@ -283,6 +283,7 @@
     const closable = new Map(data.sessions.map(s => [s.sessionId, s.closable]));
     if (prevClosable) for (const [id, ok] of closable) if (ok && prevClosable.get(id) === false) stamped.add(id);
     prevClosable = closable;
+    for (const id of shownClock.keys()) if (!closable.has(id)) shownClock.delete(id); // 終わったセッションの分は忘れる
   }
   let audioCtx;
   function chime(urgent) {
@@ -581,7 +582,7 @@
     es.onopen = () => { $('live').textContent = '更新中'; delete $('live').dataset.off; };
     es.onmessage = ev => {
       data = JSON.parse(ev.data);
-      detectChanges(); renderBoard(); renderMeters(); fresh.clear();
+      detectChanges(); renderBoard(); renderMeters(); fresh.clear(); stamped.clear();
       if (!$('view-ledger').hidden) renderLedger().catch(() => {});
       if (!$('view-usage').hidden) renderUsage().catch(() => {});
       CB.views[currentView]?.update?.(data);

@@ -209,14 +209,14 @@
   function renderSide() {
     const { esc, ago } = CB;
     const list = clashes.length
-      ? `<ul class="clash">${clashes.map(n => `<li><div class="c-file">${esc(n.rel)}</div><div class="c-who">${n.owners.map(o => `${esc(o.s.name)}（${o.edits}回、${esc(ago(o.at))}）`).join('、')}</div></li>`).join('')}</ul>`
+      ? `<ul class="clash">${clashes.map(n => `<li><div class="c-file">${esc(n.rel)}</div><div class="c-who">${n.owners.map(o => `${esc(o.s.name)}（${esc(o.edits)}回、${esc(ago(o.at))}）`).join('、')}</div></li>`).join('')}</ul>`
       : '<p class="lane-empty">いま、同じファイルを編集しているセッションはありません。</p>';
     const c = readColors();
     CB.$('map-side').innerHTML = `<div><h3>同じファイルを編集しているセッション</h3>${list}</div>
       <div><h3>見方</h3><ul class="map-key">
-        <li><i style="background:${c.call}"></i>承認待ちや停滞</li><li><i style="background:${c.turn}"></i>あなたの番</li>
-        <li><i style="background:${c.work}"></i>作業中、10分以内に編集</li><li><i style="background:${c.rest}"></i>寝かせている</li>
-        <li><i style="background:${c.ink3}"></i>48時間以内に編集したファイル</li></ul>
+        <li><i style="background:${esc(c.call)}"></i>承認待ちや停滞</li><li><i style="background:${esc(c.turn)}"></i>あなたの番</li>
+        <li><i style="background:${esc(c.work)}"></i>作業中、10分以内に編集</li><li><i style="background:${esc(c.rest)}"></i>寝かせている</li>
+        <li><i style="background:${esc(c.ink3)}"></i>48時間以内に編集したファイル</li></ul>
         <p class="lane-empty" style="margin-top:8px">点の大きさは編集回数です。セッションの点を押すと詳細を開きます。</p></div>`;
   }
 
@@ -238,8 +238,8 @@
     if (!n) { tip.hidden = true; if (CB.reduceMotion.matches) draw(0); return; }
     const { esc, ago } = CB;
     tip.innerHTML = n.kind === 'file'
-      ? `<b>${esc(n.rel)}</b><br>${n.owners.map(o => `${esc(o.s.name)}　${o.edits}回、${esc(ago(o.at))}`).join('<br>')}`
-      : n.kind === 'session' ? `<b>${esc(n.s.name)}</b><br>${esc(n.s.state.label)}　編集したファイル ${(n.s.files || []).length}件`
+      ? `<b>${esc(n.rel)}</b><br>${n.owners.map(o => `${esc(o.s.name)}　${esc(o.edits)}回、${esc(ago(o.at))}`).join('<br>')}`
+      : n.kind === 'session' ? `<b>${esc(n.s.name)}</b><br>${esc(n.s.state.label)}　編集したファイル ${esc((n.s.files || []).length)}件`
       : `<b>${esc(n.label)}</b><br>${esc(n.root)}`;
     tip.hidden = false;
     tip.style.left = Math.min(mx + 14, canvas.clientWidth - tip.offsetWidth - 8) + 'px';
