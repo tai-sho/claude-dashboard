@@ -22,7 +22,10 @@ Claude Code の並列セッションを一覧するローカルダッシュボ�
 
 - `lib/transcripts.mjs`: jsonl をファイルごとに読んだ位置（offset）を覚え、追記分だけ読む。`user` / `assistant` / `custom-title` 以外の行は JSON.parse しない（巨大な行があるため）。1セッションあたりの保持量は `TEXT_CAP` と `TIMELINE_CAP` で抑えている。
 - `lib/sessions.mjs`: `~/.claude/sessions/*.json` の busy / idle と、索引・hooks のイベント・`git status` から表示用の状態（`waiting` / `stalled` / `working` / `yours` / `idle`）と「閉じてよい」の4条件を決める。
-- `server.mjs`: `fs.watch` とポーリング（5秒）で変化を検知し、`/api/events`（SSE）で稼働中セッションを配信する。`/api/history`、`/api/search`、`/api/ledger`、`/api/session`、`/api/usage` は都度計算する。
+- `lib/review.mjs`: タイムラインから「作業中」と「あなたの番」の区間を組み立て、ふりかえりの集計をする。
+- `server.mjs`: `fs.watch` とポーリング（5秒）で変化を検知し、`/api/events`（SSE）で稼働中セッションを配信する。`/api/history`、`/api/search`、`/api/ledger`、`/api/session`、`/api/usage`、`/api/review` は都度計算する。
+- `public/app.js` が本体。つながり（`viz-map.js`）、ふりかえり（`viz-review.js`）、眺めるモード（`viz-orbit.js`）は別ファイルで、`app.js` より先に読み込まれて `window.CB` に登録し、`app.js` から道具（`esc` など）と表示・更新の合図を受け取る。
+- 3D の描画は Three.js を使わず、Canvas 2D に透視投影を自前でかけている（依存を入れないため）。惑星の表面はノイズから作った模様（プロジェクトごとに種類と模様が決まる）を画素ごとに球へ貼り、光の向きはカメラ基準で固定している。背景の星雲と天の川は、開く前の空き時間に1枚のパノラマとして作っておく。
 - 起動時に `~/.claude/projects` 全体の索引を作る（千件規模で数秒）。
 
 ## 非公開の形式に依存している箇所
@@ -40,10 +43,12 @@ Claude Code とデスクトップアプリの内部ファイルを読んでい�
 
 ## 画面のデザイン
 
-- 色・余白は `public/app.css` 冒頭の CSS 変数で管理する。ライトとダークの両方を必ず定義する。状態の色は、承認待ち・停滞が `--call`、あなたの番が `--turn`、作業中が `--work`。
+- 色・余白は `public/app.css` 冒頭の CSS 変数で管理する。ライトとダークの両方を必ず定義する。例外は眺めるモードで、宇宙を眺める画面なのでテーマに関係なく暗い。その色は `.ambient` の中だけで定義する。状態の色は、承認待ち・停滞が `--call`、あなたの番が `--turn`、作業中が `--work`。
 - 書体は IBM Plex Sans JP の1書体。数字は `.num`（等幅数字）。
 - 文言は日本語。利用者から見た言葉で書き、内部の用語（busy、jsonl など）を画面に出さない。すべて大文字のラベル、見出し上の小さなラベル、中黒でつないだメタ情報は使わない。
-- 動きは、新しく呼ばれた伝票の一度きりの強調と、作業中の点の明滅だけ。`prefers-reduced-motion` を尊重する。
+- 動きは、**状態が変わったことを伝えるもの**（呼ばれた伝票の強調、待ち時間の桁のめくれ、判子）と、**作業が続いていることを示すもの**（作業中の点、心電図、星座図の光、眺めるモードの公転）に限る。飾りだけの動きは足さない。
+- `prefers-reduced-motion` を尊重する。めくれ・判子・明滅は止め、Canvas の画面は動かさずに1枚だけ描く。
+- Canvas の描画は、画面が隠れているとき（`document.hidden`、別の画面を開いているとき）は止める。色は `CB.cssVar()` で CSS 変数から読み、ライトとダークの両方で見えるようにする。
 - 画面に出す値はすべて `esc()` を通す。`innerHTML` に生の文字列を入れない。
 
 ## 確認の仕方

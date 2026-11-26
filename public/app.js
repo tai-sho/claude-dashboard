@@ -1,5 +1,7 @@
 (() => {
   const $ = id => document.getElementById(id);
+  // 星座図・ふりかえり・眺めるモードは別ファイル（viz-*.js）。先に読み込まれ、ここに登録されている
+  const CB = window.CB = window.CB || { views: {} };
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
@@ -10,7 +12,11 @@
   let arrange = store.get('arrange', 'project') === 'state' ? 'state' : 'project'; // 盤面の並べ方
   let data = null;
   let prevStates = null;
+  let prevClosable = null;
   const fresh = new Set();
+  const stamped = new Set();   // 今回「閉じてよい」になったセッション（判子を一度だけ押す）
+  const shownClock = new Map(); // セッションごとに前回表示した待ち時間（変わった桁だけめくる）
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
   // ---------- 共通 ----------
   const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -80,8 +86,60 @@
   }
   const since = s => s.state.since || s.lastActivityAt;
 
+  // 発車標のように、前回から変わった桁だけをめくる
+  function flaps(id, text) {
+    const prev = shownClock.get(id);
+    shownClock.set(id, text);
+    const cur = [...text], old = prev == null ? null : [...prev];
+    let k = 0;
+    return cur.map((c, i) => {
+      const j = old ? old.length - (cur.length - i) : -1;
+      const flip = old && (j < 0 || old[j] !== c);
+      return `<span class="flap${flip ? ' flip' : ''}"${flip ? ` style="animation-delay:${k++ * 70}ms"` : ''}>${esc(c)}</span>`;
+    }).join('');
+  }
+
+  // 待たせている時間で伝票の紙が焼けていく（2時間でいちばん濃くなる）
+  const ageOf = s => Math.min(1, Math.sqrt(Math.max(0, Date.now() - since(s)) / (120 * 60000)));
+
+  // ---------- 心電図（直近10分の動き） ----------
+  const ECG_SPAN = 10 * 60000, ECG_W = 240, ECG_BASE = 19;
+  function ecgPath(beats, now) {
+    const pts = [];
+    for (const [at, kind] of beats || []) {
+      const x = ECG_W * (1 - (now - at) / ECG_SPAN);
+      if (x < -4 || x > ECG_W + 4) continue;
+      const h = kind === 't' ? 15 : kind === 'r' ? 10 : 7;
+      const last = pts.at(-1);
+      if (last && x - last.x < 4) { last.h = Math.max(last.h, h); continue; } // 近すぎる拍はまとめる
+      pts.push({ x, h });
+    }
+    let d = `M0 ${ECG_BASE}`;
+    for (const { x, h } of pts) {
+      const f = n => (x + n).toFixed(1);
+      d += ` L${f(-4)} ${ECG_BASE} L${f(-2)} ${ECG_BASE + 3} L${f(0)} ${ECG_BASE - h} L${f(2)} ${ECG_BASE + 4} L${f(4)} ${ECG_BASE}`;
+    }
+    return d + ` L${ECG_W} ${ECG_BASE}`;
+  }
+  function ecg(s) {
+    if (s.state.key !== 'working' && s.state.key !== 'stalled') return '';
+    return `<div class="ecg" title="直近10分の動き（高い山がツール、低い山が返答）">
+      <svg viewBox="0 0 ${ECG_W} 26" preserveAspectRatio="none" aria-hidden="true"><path data-ecg="${esc(s.sessionId)}" d="${ecgPath(s.beats, Date.now())}"/></svg>
+      <span class="ecg-head" aria-hidden="true"></span></div>`;
+  }
+  function tickEcg() {
+    if (!data || document.hidden) return;
+    const now = Date.now();
+    const byId = new Map(data.sessions.map(s => [s.sessionId, s]));
+    for (const p of document.querySelectorAll('path[data-ecg]')) p.setAttribute('d', ecgPath(byId.get(p.dataset.ecg)?.beats, now));
+  }
+  setInterval(tickEcg, 1000);
+
+  const clearFlag = s => `<span class="flag clear stamp${stamped.has(s.sessionId) ? ' pressed' : ''}">閉じてよい</span>`;
+
   function ticket(s, big, inProject) {
     const e = elapsed(Date.now() - since(s));
+    const aged = laneOf(s) === 'you' ? ` style="--age:${ageOf(s).toFixed(2)}"` : '';
     const place = where(s, inProject);
     const st = s.state;
     const stateText = st.key === 'working' ? `<span class="pulse" aria-hidden="true"></span>${esc(st.label)}` : esc(st.label);
@@ -92,13 +150,13 @@
       ? `<ul class="tools">${s.recentTools.slice(0, big ? 3 : 2).map(t => `<li><b>${esc(t.name)}</b>${esc(t.detail)}</li>`).join('')}</ul>` : '';
     const ack = st.key === 'yours' ? `<button class="act" data-ack="${esc(s.sessionId)}">確認した</button>` : '';
     return `
-    <article class="ticket${big ? '' : ' compact'}${fresh.has(s.sessionId) ? ' fresh' : ''}" data-state="${esc(st.key)}">
+    <article class="ticket${big ? '' : ' compact'}${fresh.has(s.sessionId) ? ' fresh' : ''}${aged ? ' aged' : ''}" data-state="${esc(st.key)}"${aged}>
       <div>
         <h3 class="t-name"><button data-detail="${esc(s.sessionId)}">${esc(s.name)}</button></h3>
         ${place ? `<p class="t-where">${place}</p>` : ''}
       </div>
       <div class="clock num" title="${esc(new Date(since(s)).toLocaleString('ja-JP'))}">
-        <span class="elapsed">${e.n}<small>${e.u}</small></span>
+        <span class="elapsed" aria-label="${e.n}${e.u}">${flaps(s.sessionId, String(e.n))}<small>${e.u}</small></span>
         <span class="state">${stateText}</span>
       </div>
       ${st.key !== 'yours' && st.reason && !tools ? `<p class="reason">${esc(st.reason)}</p>` : ''}
@@ -109,8 +167,9 @@
         ${s.skills?.length ? `<div class="say skills"><dt>スキル</dt><dd>${esc(s.skills.join('、'))}</dd></div>` : ''}
       </dl>
       ${tools}
+      ${ecg(s)}
       <div class="foot">
-        ${gitFlag(s)}${s.closable ? '<span class="flag clear">閉じてよい</span>' : ''}
+        ${gitFlag(s)}${s.closable ? clearFlag(s) : ''}
         <span class="spacer"></span>
         ${openActions(s)}
         ${ack}
@@ -120,7 +179,7 @@
   }
 
   function closeFlag(s) {
-    if (s.closable) return '<span class="flag clear">閉じてよい</span>';
+    if (s.closable) return clearFlag(s);
     return gitFlag(s) || `<span class="flag">${esc(s.state?.label || '')}</span>`;
   }
 
@@ -218,9 +277,13 @@
     if (prevStates) {
       const called = data.sessions.filter(s => now[s.sessionId] !== 'other' && prevStates[s.sessionId] !== now[s.sessionId]);
       for (const s of called) fresh.add(s.sessionId);
-      if (called.length) alertUser(called);
+      if (called.length) { alertUser(called); CB.ambient?.close(); } // 眺めている最中に呼ばれたら盤面に戻す
     }
     prevStates = now;
+    const closable = new Map(data.sessions.map(s => [s.sessionId, s.closable]));
+    if (prevClosable) for (const [id, ok] of closable) if (ok && prevClosable.get(id) === false) stamped.add(id);
+    prevClosable = closable;
+    for (const id of shownClock.keys()) if (!closable.has(id)) shownClock.delete(id); // 終わったセッションの分は忘れる
   }
   let audioCtx;
   function chime(urgent) {
@@ -486,17 +549,29 @@
   syncControls();
   syncArrange();
 
+  // ---------- 別ファイルの画面に渡す道具 ----------
+  const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  Object.assign(CB, { $, esc, ago, hhmm, dayKey, dayLabel, elapsed, getJson, openDetail, cssVar, laneOf, since, reduceMotion, getData: () => data });
+  for (const v of Object.values(CB.views)) v.init?.(CB);
+  CB.ambient?.init?.(CB);
+
   // ---------- 画面切り替え ----------
+  const VIEWS = ['board', 'ledger', 'history', 'usage', 'map', 'review'];
+  let currentView = null;
   function route() {
-    const view = (location.hash.slice(1) || 'board').split('?')[0];
-    for (const v of ['board', 'ledger', 'history', 'usage']) {
+    let view = (location.hash.slice(1) || 'board').split('?')[0];
+    if (!VIEWS.includes(view)) view = 'board';
+    for (const v of VIEWS) {
       $('view-' + v).hidden = v !== view;
       const link = document.querySelector(`.views a[data-view="${v}"]`);
       if (v === view) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
     }
+    if (currentView !== view) CB.views[currentView]?.hide?.();
+    currentView = view;
     if (view === 'ledger') renderLedger().catch(() => {});
     if (view === 'history') renderHistory().catch(() => {});
     if (view === 'usage') renderUsage().catch(() => {});
+    CB.views[view]?.show?.();
   }
   window.addEventListener('hashchange', route);
   route();
@@ -507,9 +582,11 @@
     es.onopen = () => { $('live').textContent = '更新中'; delete $('live').dataset.off; };
     es.onmessage = ev => {
       data = JSON.parse(ev.data);
-      detectChanges(); renderBoard(); renderMeters(); fresh.clear();
+      detectChanges(); renderBoard(); renderMeters(); fresh.clear(); stamped.clear();
       if (!$('view-ledger').hidden) renderLedger().catch(() => {});
       if (!$('view-usage').hidden) renderUsage().catch(() => {});
+      CB.views[currentView]?.update?.(data);
+      CB.ambient?.update?.(data);
     };
     es.onerror = () => { $('live').textContent = 'サーバーに接続できません'; $('live').dataset.off = ''; };
   }

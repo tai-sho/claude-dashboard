@@ -137,6 +137,24 @@ describe('API', () => {
     assert.equal((await request('/api/session?id=missing')).status, 404);
   });
 
+  test('/api/review は今日の稼働帯と週のまとめを返す', async () => {
+    const { status, json } = await getJson('/api/review?from=' + (Date.now() - 2 * 3600000));
+    assert.equal(status, 200);
+    const live = json.today.find(r => r.sessionId === 'live-1');
+    assert.ok(live, '稼働中のセッションが今日の帯に入る');
+    assert.equal(live.segs[0][2], 'w');
+    assert.equal(live.segs.at(-1)[2], 't'); // 返答のあとは「あなたの番」が今まで続く
+    assert.ok(!json.today.some(r => r.sessionId === 'sdk-1'));
+    assert.equal(json.week.prompts, 2);
+    assert.equal(json.week.sessions, 2);
+  });
+
+  test('/api/state の稼働中セッションは心電図用の動きを持つ', async () => {
+    const { json } = await getJson('/api/state');
+    assert.deepEqual(json.sessions[0].beats.map(b => b[1]), ['p', 'r']);
+    assert.deepEqual(json.sessions[0].files, []);
+  });
+
   test('/api/usage は記録が無ければ空', async () => {
     const { json } = await getJson('/api/usage');
     assert.deepEqual(json, { installed: false, current: null, history: [] });
