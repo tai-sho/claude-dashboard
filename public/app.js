@@ -277,7 +277,7 @@
     if (prevStates) {
       const called = data.sessions.filter(s => now[s.sessionId] !== 'other' && prevStates[s.sessionId] !== now[s.sessionId]);
       for (const s of called) fresh.add(s.sessionId);
-      if (called.length) { alertUser(called); CB.ambient?.close(); } // 眺めている最中に呼ばれたら盤面に戻す
+      if (called.length) { alertUser(called); CB.ambient?.notify?.(called); } // 眺めている最中は閉じずに、宇宙の画面の中で知らせる
     }
     prevStates = now;
     const closable = new Map(data.sessions.map(s => [s.sessionId, s.closable]));

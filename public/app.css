@@ -459,7 +459,7 @@ dialog.detail::backdrop { background: rgb(20 28 30 / .35); }
   position: fixed; inset: 0; z-index: 20; background: #03060c; color: var(--hud);
 }
 body:has(.ambient:not([hidden])) { overflow: hidden; }
-.ambient canvas { display: block; width: 100%; height: 100%; }
+.ambient canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .amb-hud { position: absolute; left: 32px; top: 24px; pointer-events: none; text-shadow: 0 1px 14px rgb(0 0 0 / .7); }
 .amb-clock { margin: 0; font-size: clamp(40px, 7vw, 88px); font-weight: 600; line-height: 1; letter-spacing: -0.03em; }
 .amb-verdict { margin: 10px 0 0; font-size: clamp(16px, 2vw, 22px); font-weight: 600; color: var(--hud-2); }
@@ -473,7 +473,29 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
 }
 .ambient .amb-close:hover { color: var(--hud); border-color: rgb(255 255 255 / .35); }
 .ambient :focus-visible { outline-color: var(--beacon-work); }
-.ambient canvas { touch-action: none; }
+#ambient-overlay { touch-action: none; }
+
+/* 呼ばれたときの知らせ: 画面は閉じず、下に出す。押すとその衛星に寄る */
+.amb-call {
+  --tone: var(--beacon-call);
+  position: absolute; left: 50%; bottom: 56px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 48px);
+  display: flex; align-items: center; gap: 14px; padding: 10px 14px 10px 16px;
+  border: 1px solid color-mix(in oklab, var(--tone) 55%, transparent); border-radius: 999px;
+  background: rgb(6 11 22 / .82); backdrop-filter: blur(10px); color: var(--hud);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / .3), 0 10px 32px rgb(0 0 0 / .45);
+}
+.amb-call[data-tone="turn"] { --tone: var(--beacon-turn); }
+.amb-call i { width: 9px; height: 9px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 10px var(--tone); flex: none; }
+.amb-call p { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 14px; min-width: 0; }
+.amb-call b { font-weight: 600; overflow-wrap: anywhere; }
+.amb-call p span { color: var(--tone); font-size: 13px; font-weight: 600; }
+.amb-call .amb-call-more { color: var(--hud-3); font-weight: 400; }
+.amb-call .ctl { background: rgb(255 255 255 / .08); border-color: color-mix(in oklab, var(--tone) 60%, transparent); color: var(--hud); white-space: nowrap; }
+.amb-call .ctl:hover { background: rgb(255 255 255 / .14); }
+@media (prefers-reduced-motion: no-preference) {
+  .amb-call:not([hidden]) i { animation: amb-call-beat 1.6s ease-in-out infinite; }
+}
+@keyframes amb-call-beat { 50% { box-shadow: 0 0 2px var(--tone); opacity: .55; } }
 .amb-help { position: absolute; left: 32px; bottom: 22px; margin: 0; font-size: 12.5px; color: var(--hud-3); pointer-events: none; text-shadow: 0 1px 8px rgb(0 0 0 / .8); }
 
 /* 観測カード: 押した天体の様子。キャンバスの線がこのカードの左上につながる */
@@ -526,6 +548,7 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
   .amb-hud { left: 16px; top: 16px; }
   .ambient .amb-close { right: 16px; top: 16px; }
   .amb-help { display: none; }
+  .amb-call { left: 16px; right: 16px; bottom: auto; top: 140px; transform: none; width: auto; max-width: none; border-radius: 12px; flex-wrap: wrap; }
   .amb-card { left: 16px; right: 16px; top: auto; bottom: 16px; width: auto; max-height: 46%; }
   .top { grid-template-columns: 1fr; padding: 20px 16px 0; }
   .controls { justify-content: flex-start; }
