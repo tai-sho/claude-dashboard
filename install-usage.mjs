@@ -12,13 +12,16 @@ const settingsPath = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.hom
 const stateDir = path.join(os.homedir(), '.claude-dashboard');
 const originalPath = path.join(stateDir, 'statusline-original.json');
 const tap = path.join(path.dirname(fileURLToPath(import.meta.url)), 'hooks', 'statusline-tap.mjs');
-const MARK = 'claude-dashboard/hooks/statusline-tap.mjs';
+const shQuote = v => `'${String(v).replace(/'/g, `'\\''`)}'`; // シェルで展開されないよう単一引用符で囲む
+const command = `node ${shQuote(tap)} # claude-dashboard:statusline-tap`;
+// 挟み済みかの判定。別の場所に clone したものが挟んだ場合も含める（自分を「元の statusline」として退避すると自分を呼び続けるため）
+const isTap = cmd => /claude-dashboard:statusline-tap|hooks[\\/]statusline-tap\.mjs/.test(String(cmd || ''));
 const remove = process.argv.includes('--remove');
 
 const raw = fs.existsSync(settingsPath) ? fs.readFileSync(settingsPath, 'utf8') : '{}';
 const settings = JSON.parse(raw);
 const current = settings.statusLine;
-const installed = String(current?.command || '').includes(MARK);
+const installed = isTap(current?.command);
 
 if (remove) {
   if (!installed) { console.log('挟まっていません。変更なし。'); process.exit(0); }
@@ -29,8 +32,7 @@ if (remove) {
   if (installed) { console.log('すでに挟まっています。変更なし。'); process.exit(0); }
   fs.mkdirSync(stateDir, { recursive: true });
   fs.writeFileSync(originalPath, JSON.stringify({ command: current?.command || null, statusLine: current || null }, null, 2));
-  const shQuote = v => `'${String(v).replace(/'/g, `'\\''`)}'`; // シェルで展開されないよう単一引用符で囲む
-  settings.statusLine = { ...(current || {}), type: 'command', command: `node ${shQuote(tap)}` };
+  settings.statusLine = { ...(current || {}), type: 'command', command };
 }
 
 const backup = `${settingsPath}.bak.dashboard-${Date.now()}`;

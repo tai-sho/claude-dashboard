@@ -20,9 +20,15 @@ const indexStatus = { ready: false, done: 0, total: 0 };
 function readUsage() {
   try { return JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'usage.json'), 'utf8')); } catch { return null; }
 }
-function usageTapInstalled() {
-  try { return fs.readFileSync(path.join(CLAUDE_DIR, 'settings.json'), 'utf8').includes('claude-dashboard/hooks/statusline-tap.mjs'); } catch { return false; }
+// settings.json にこのダッシュボードの登録があるか。install-*.mjs がコマンド末尾に付ける印で見分ける
+// （印の無い以前の版の登録は、フォルダ名が claude-dashboard の場合だけ見分けられる）
+function settingsMention(marks) {
+  try {
+    const text = fs.readFileSync(path.join(CLAUDE_DIR, 'settings.json'), 'utf8');
+    return marks.some(m => text.includes(m));
+  } catch { return false; }
 }
+const usageTapInstalled = () => settingsMention(['# claude-dashboard:statusline-tap', 'hooks/statusline-tap.mjs']);
 async function apiUsage(url) {
   const days = Math.min(30, Number(url.searchParams.get('days') || 8));
   const since = Date.now() - days * 86400000;
@@ -37,9 +43,7 @@ async function apiUsage(url) {
   return { installed: usageTapInstalled(), current: readUsage(), history: rows };
 }
 
-function hooksInstalled() {
-  try { return fs.readFileSync(path.join(CLAUDE_DIR, 'settings.json'), 'utf8').includes('claude-dashboard/hooks/record.mjs'); } catch { return false; }
-}
+const hooksInstalled = () => settingsMention(['# claude-dashboard:record', 'claude-dashboard/hooks/record.mjs']);
 
 // ---------- ライブ状態の配信 ----------
 const clients = new Set();

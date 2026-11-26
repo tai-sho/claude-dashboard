@@ -50,9 +50,11 @@ Claude Code とデスクトップアプリの内部ファイルを読んでい�
 
 ```bash
 for f in server.mjs install-*.mjs lib/*.mjs hooks/*.mjs public/app.js; do node --check "$f" || echo "NG: $f"; done
+npm test                    # node:test。HOME と CLAUDE_CONFIG_DIR を一時ディレクトリに向けて合成データで動かす
 PORT=4399 node server.mjs   # 動いている本番と別のポートで起動して確認する
 ```
 
+- テストは `test/` にある。依存パッケージは使わず `node:test` で書く。実際の `~/.claude` を読まないよう、`test/helpers.mjs` の `sandboxEnv()` を対象モジュールの import より前に呼ぶ。
 - API は `curl -s localhost:4399/api/state` などで確認できる。
 - 使用枠や hooks の動作は、`HOME` を一時ディレクトリに向け、`CLAUDE_CONFIG_DIR` を実際の `~/.claude` に向けて起動すると、合成データで確認できる（`~/.claude-dashboard` の読み書き先だけが入れ替わる）。
 - `install-*.mjs` は、`HOME` を一時ディレクトリに向け、そこに用意した `settings.json` で追加と `--remove` の往復を試してから使う。
