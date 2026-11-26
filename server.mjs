@@ -20,9 +20,14 @@ const indexStatus = { ready: false, done: 0, total: 0 };
 function readUsage() {
   try { return JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'usage.json'), 'utf8')); } catch { return null; }
 }
-function usageTapInstalled() {
-  try { return fs.readFileSync(path.join(CLAUDE_DIR, 'settings.json'), 'utf8').includes('claude-dashboard/hooks/statusline-tap.mjs'); } catch { return false; }
+// settings.json にこのダッシュボードのスクリプトが登録されているか（フォルダ名が claude-dashboard でなくても分かるよう、今の置き場所でも確かめる）
+function settingsMention(script) {
+  try {
+    const text = fs.readFileSync(path.join(CLAUDE_DIR, 'settings.json'), 'utf8');
+    return text.includes(`claude-dashboard/hooks/${script}`) || text.includes(JSON.stringify(path.join(ROOT, 'hooks', script)).slice(1, -1));
+  } catch { return false; }
 }
+const usageTapInstalled = () => settingsMention('statusline-tap.mjs');
 async function apiUsage(url) {
   const days = Math.min(30, Number(url.searchParams.get('days') || 8));
   const since = Date.now() - days * 86400000;
@@ -37,9 +42,7 @@ async function apiUsage(url) {
   return { installed: usageTapInstalled(), current: readUsage(), history: rows };
 }
 
-function hooksInstalled() {
-  try { return fs.readFileSync(path.join(CLAUDE_DIR, 'settings.json'), 'utf8').includes('claude-dashboard/hooks/record.mjs'); } catch { return false; }
-}
+const hooksInstalled = () => settingsMention('record.mjs');
 
 // ---------- ライブ状態の配信 ----------
 const clients = new Set();

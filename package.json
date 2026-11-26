@@ -7,6 +7,7 @@
   "description": "Claude Code の並列セッションを一覧する呼び出し盤（ローカル専用）",
   "scripts": {
     "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs",
     "restart": "lsof -ti tcp:${PORT:-4317} -sTCP:LISTEN | xargs kill 2>/dev/null; sleep 1; node server.mjs",
     "hooks:install": "node install-hooks.mjs",
     "hooks:remove": "node install-hooks.mjs --remove",

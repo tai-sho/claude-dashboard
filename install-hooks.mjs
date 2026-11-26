@@ -12,7 +12,9 @@ const script = path.join(path.dirname(fileURLToPath(import.meta.url)), 'hooks', 
 // シェルで展開されないよう単一引用符で囲む
 const shQuote = v => `'${String(v).replace(/'/g, `'\\''`)}'`;
 const command = `node ${shQuote(script)}`;
-const MARK = 'claude-dashboard/hooks/record.mjs';
+// 自分が登録した hooks の見分け方。今のコマンドと完全に一致するか、以前の版の判定（フォルダ名が claude-dashboard の場合）に合うもの
+const LEGACY_MARK = 'claude-dashboard/hooks/record.mjs';
+const isMine = h => h.command === command || String(h.command || '').includes(LEGACY_MARK);
 // 登録するイベント。以前の版で登録した他のイベントの分は、再実行で取り除かれる
 const EVENTS = ['Notification', 'PermissionRequest', 'SessionEnd'];
 const LEGACY_EVENTS = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'];
@@ -24,7 +26,7 @@ settings.hooks ||= {};
 
 for (const ev of [...EVENTS, ...LEGACY_EVENTS]) {
   const groups = (settings.hooks[ev] || [])
-    .map(g => ({ ...g, hooks: (g.hooks || []).filter(h => !String(h.command || '').includes(MARK)) }))
+    .map(g => ({ ...g, hooks: (g.hooks || []).filter(h => !isMine(h)) }))
     .filter(g => g.hooks.length);
   if (!remove && EVENTS.includes(ev)) groups.push({ hooks: [{ type: 'command', command, timeout: 3, async: true }] });
   if (groups.length) settings.hooks[ev] = groups; else delete settings.hooks[ev];
