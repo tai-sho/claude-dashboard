@@ -1,0 +1,9 @@
+{
+  "name": "Claude 呼び出し盤",
+  "short_name": "呼び出し盤",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e3e7e1",
+  "theme_color": "#e3e7e1",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
