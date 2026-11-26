@@ -47,7 +47,7 @@ Claude Code の hooks を使って、許可の確認が出たセッションを�
 npm run hooks:install
 ```
 
-`~/.claude/settings.json` に hooks を追記します。既存の hooks はそのまま残り、元の設定はバックアップされます。新しく始めたセッションから有効になります。外すときは `npm run hooks:remove` を実行します。
+`~/.claude/settings.json` の Notification / PermissionRequest / SessionEnd に hooks を追記します。既存の hooks はそのまま残り、元の設定はバックアップされます。新しく始めたセッションから有効になります。以前の版で登録した場合も、再実行すると今の構成に整理されます。外すときは `npm run hooks:remove` を実行します。
 
 ### 使用枠の記録を有効にする（任意）
 
@@ -90,7 +90,7 @@ statusline はターミナルで動かす Claude Code でのみ実行されま�
 | 依頼・返答・ツール・触ったファイル・スキル・引き継ぎ文 | `~/.claude/projects/<フォルダ>/<セッションID>.jsonl`（追記された分だけ読む） |
 | デスクトップアプリのセッション ID・タイトル | `~/Library/Application Support/Claude/claude-code-sessions/**/local_*.json`（macOS） |
 | 未コミット・未プッシュの変更 | 各作業フォルダで `git status` |
-| 承認待ち | hooks が書く `~/.claude-dashboard/events/<セッションID>.json` |
+| 承認待ち | hooks が書く `~/.claude-dashboard/events/<セッションID>.notification.json` と `.permission.json` |
 | 使用枠 | statusline の入力を記録した `~/.claude-dashboard/usage.json` と `usage-history.jsonl` |
 
 ダッシュボード自身が書き込むのは `~/.claude-dashboard/` と、インストールコマンドを実行した場合の `~/.claude/settings.json` だけです。

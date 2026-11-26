@@ -29,7 +29,8 @@ if (remove) {
   if (installed) { console.log('すでに挟まっています。変更なし。'); process.exit(0); }
   fs.mkdirSync(stateDir, { recursive: true });
   fs.writeFileSync(originalPath, JSON.stringify({ command: current?.command || null, statusLine: current || null }, null, 2));
-  settings.statusLine = { ...(current || {}), type: 'command', command: `node ${JSON.stringify(tap)}` };
+  const shQuote = v => `'${String(v).replace(/'/g, `'\\''`)}'`; // シェルで展開されないよう単一引用符で囲む
+  settings.statusLine = { ...(current || {}), type: 'command', command: `node ${shQuote(tap)}` };
 }
 
 const backup = `${settingsPath}.bak.dashboard-${Date.now()}`;

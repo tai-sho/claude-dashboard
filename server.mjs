@@ -139,7 +139,8 @@ function apiSearch(url) {
     for (const t of a.timeline) {
       if (t.kind === 'tool') continue;
       const lower = t.text.toLowerCase();
-      if (terms.every(term => lower.includes(term) || head.includes(term))) {
+      // 少なくとも1語は本文に含まれていること（フォルダ名などにだけ含まれる語で全件一致させない）
+      if (terms.some(term => lower.includes(term)) && terms.every(term => lower.includes(term) || head.includes(term))) {
         const pos = Math.max(0, lower.indexOf(terms.find(term => lower.includes(term)) ?? terms[0]));
         matched.push({ kind: t.kind, at: t.at, snippet: (pos > 40 ? '…' : '') + t.text.slice(Math.max(0, pos - 40), pos + 140) });
       }
@@ -164,8 +165,10 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 const sendJson = (res, body, code = 200) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
+  // DNS rebinding 対策: localhost 以外の Host は拒否（URL を組み立てる前に確かめる）
   if (!/^(127\.0\.0\.1|localhost)(:\d+)?$/.test(req.headers.host || '')) { res.writeHead(403); return res.end(); }
+  let url;
+  try { url = new URL(req.url, 'http://localhost'); } catch { res.writeHead(400); return res.end(); }
   try {
     switch (url.pathname) {
       case '/api/state':
@@ -194,8 +197,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   const rel = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
-  const file = path.join(ROOT, 'public', path.normalize(rel));
-  if (!file.startsWith(path.join(ROOT, 'public'))) { res.writeHead(403); return res.end(); }
+  const publicDir = path.join(ROOT, 'public');
+  const file = path.join(publicDir, path.normalize(rel));
+  const inside = path.relative(publicDir, file);
+  if (!inside || inside.startsWith('..') || path.isAbsolute(inside)) { res.writeHead(403); return res.end(); }
   try {
     const body = await fsp.readFile(file);
     res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });

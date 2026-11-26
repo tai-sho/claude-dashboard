@@ -9,20 +9,24 @@ import { fileURLToPath } from 'node:url';
 
 const settingsPath = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'settings.json');
 const script = path.join(path.dirname(fileURLToPath(import.meta.url)), 'hooks', 'record.mjs');
-const command = `node ${JSON.stringify(script)}`;
+// シェルで展開されないよう単一引用符で囲む
+const shQuote = v => `'${String(v).replace(/'/g, `'\\''`)}'`;
+const command = `node ${shQuote(script)}`;
 const MARK = 'claude-dashboard/hooks/record.mjs';
-const EVENTS = ['Notification', 'PermissionRequest', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionEnd'];
+// 登録するイベント。以前の版で登録した他のイベントの分は、再実行で取り除かれる
+const EVENTS = ['Notification', 'PermissionRequest', 'SessionEnd'];
+const LEGACY_EVENTS = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'];
 const remove = process.argv.includes('--remove');
 
 const raw = fs.existsSync(settingsPath) ? fs.readFileSync(settingsPath, 'utf8') : '{}';
 const settings = JSON.parse(raw);
 settings.hooks ||= {};
 
-for (const ev of EVENTS) {
+for (const ev of [...EVENTS, ...LEGACY_EVENTS]) {
   const groups = (settings.hooks[ev] || [])
     .map(g => ({ ...g, hooks: (g.hooks || []).filter(h => !String(h.command || '').includes(MARK)) }))
     .filter(g => g.hooks.length);
-  if (!remove) groups.push({ hooks: [{ type: 'command', command, timeout: 3, async: true }] });
+  if (!remove && EVENTS.includes(ev)) groups.push({ hooks: [{ type: 'command', command, timeout: 3, async: true }] });
   if (groups.length) settings.hooks[ev] = groups; else delete settings.hooks[ev];
 }
 

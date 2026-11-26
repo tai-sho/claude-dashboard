@@ -44,20 +44,24 @@
     if (s.git.ahead > 0) return `<span class="flag dirty">未プッシュ ${s.git.ahead}件</span>`;
     return '';
   }
+  // シェルに貼っても展開されないよう単一引用符で囲む
+  const shQuote = s => `'${String(s).replace(/'/g, `'\\''`)}'`;
   // Claude アプリで開くリンク（アプリのセッションでなければ再開コマンドのコピー）
   function openActions(s) {
     const out = [];
     if (s.hostSessionId) out.push(`<a class="act primary" href="claude://code/continue?session=${encodeURIComponent(s.hostSessionId)}&source=url_external">Claude で開く</a>`);
-    else if (s.cwd) out.push(`<button class="act" data-copy="${esc(`cd ${JSON.stringify(s.cwd)} && claude --resume ${s.sessionId}`)}" data-copied="再開コマンドをコピーしました">再開コマンドをコピー</button>`);
+    else if (s.cwd) out.push(`<button class="act" data-copy="${esc(`cd ${shQuote(s.cwd)} && claude --resume ${shQuote(s.sessionId)}`)}" data-copied="再開コマンドをコピーしました">再開コマンドをコピー</button>`);
     if (s.cwd) out.push(`<button class="act" data-copy="${esc(s.cwd)}" data-copied="パスをコピーしました">パスをコピー</button>`);
     return out.join('');
   }
   function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1600); }
   async function getJson(url) { const r = await fetch(url); if (!r.ok) throw new Error(r.status); return r.json(); }
+  // 元の文字列を検索語で区切ってから、各部分をエスケープして一致部分だけを囲む（エスケープ後の文字列に当てると &amp; などを壊すため）
   function highlight(text, terms) {
-    let h = esc(text);
-    for (const t of terms) if (t) h = h.replace(new RegExp(esc(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => `<mark>${m}</mark>`);
-    return h;
+    const words = terms.filter(Boolean).map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    if (!words.length) return esc(text);
+    const re = new RegExp(`(${words.join('|')})`, 'gi');
+    return String(text ?? '').split(re).map((part, i) => (i % 2 ? `<mark>${esc(part)}</mark>` : esc(part))).join('');
   }
 
   // ---------- 呼び出し盤 ----------
@@ -345,14 +349,17 @@
   $('q').addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(renderHistory, 220); });
 
   // ---------- 詳細パネル ----------
+  let detailSeq = 0;
   async function openDetail(id, q) {
+    const seq = ++detailSeq; // 後から開いたものだけを描く
     const dlg = $('detail');
     $('d-title').textContent = '読み込み中';
     $('d-where').textContent = ''; $('d-actions').innerHTML = ''; $('d-body').innerHTML = '';
     if (!dlg.open) dlg.showModal();
     let s;
     try { s = await getJson('/api/session?id=' + encodeURIComponent(id)); }
-    catch { $('d-title').textContent = 'このセッションの記録が見つかりません'; return; }
+    catch { if (seq === detailSeq) $('d-title').textContent = 'このセッションの記録が見つかりません'; return; }
+    if (seq !== detailSeq) return;
     const live = data?.sessions.find(x => x.sessionId === id);
     $('d-title').textContent = s.name;
     $('d-where').innerHTML = `${where(s)}　${s.live ? esc(s.state?.label) : s.archived ? 'アーカイブ済み' : '終了'}　${esc(new Date(s.firstPromptAt || s.lastActivityAt).toLocaleString('ja-JP'))} 開始`;

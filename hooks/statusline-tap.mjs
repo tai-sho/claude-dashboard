@@ -9,7 +9,8 @@ import { spawn } from 'node:child_process';
 const DIR = path.join(os.homedir(), '.claude-dashboard');
 const ORIGINAL = path.join(DIR, 'statusline-original.json');
 
-const input = fs.readFileSync(0, 'utf8');
+let input = '';
+try { input = fs.readFileSync(0, 'utf8'); } catch { /* 入力が読めなくても元の statusline は動かす */ }
 
 try {
   const d = JSON.parse(input || '{}');
@@ -37,5 +38,5 @@ try { original = JSON.parse(fs.readFileSync(ORIGINAL, 'utf8')); } catch {}
 if (!original?.command) process.exit(0);
 const child = spawn(original.command, { shell: true, stdio: ['pipe', 'inherit', 'inherit'] });
 child.stdin.end(input);
-child.on('exit', code => process.exit(code ?? 0));
+child.on('exit', () => process.exit(0));
 child.on('error', () => process.exit(0));
