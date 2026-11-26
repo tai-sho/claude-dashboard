@@ -156,6 +156,37 @@ main { padding: 8px 32px 48px; }
 .grid-you { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; }
 .grid-work { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 
+/* 並べ方の切り替え */
+.arrange { display: flex; align-items: center; justify-content: flex-end; gap: 0; margin-top: 18px; font-size: 13px; }
+.arrange span { color: var(--ink-3); margin-right: 10px; }
+.arrange button {
+  border: 1px solid var(--rule); background: var(--surface); color: var(--ink-2);
+  padding: 4px 12px; cursor: pointer;
+}
+.arrange button + button { border-left: 0; }
+.arrange button:first-of-type { border-radius: 999px 0 0 999px; }
+.arrange button:last-of-type { border-radius: 0 999px 999px 0; }
+.arrange button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 600; }
+
+/* プロジェクト別: 名前 ─── 件数 の棚札を見出しにする */
+.proj { margin-top: 26px; }
+.arrange + #board-projects > .proj:first-child { margin-top: 8px; }
+.proj > h2 {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px;
+  margin: 0 0 12px; font-size: 18px; font-weight: 600; line-height: 1.35;
+}
+.proj .p-name { overflow-wrap: anywhere; min-width: 0; }
+.proj > h2::after { content: ""; order: 1; flex: 1 1 40px; align-self: center; border-top: 1px solid var(--rule); }
+.proj .p-tally { order: 2; display: flex; gap: 14px; font-size: 13px; font-weight: 500; color: var(--ink-3); }
+.proj .pc b { font-size: 15px; font-weight: 600; color: var(--ink-2); margin-left: 2px; }
+.proj .pc[data-tone="call"] { color: var(--call); }
+.proj .pc[data-tone="call"] b { color: var(--call); }
+.proj .pc[data-tone="turn"] b { color: var(--turn); }
+.proj .pc[data-tone="work"] b { color: var(--work); }
+.proj[data-rank="3"] > h2 { font-size: 16px; color: var(--ink-2); }
+.grid-proj { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; }
+.grid-proj + .rows { margin-top: 12px; }
+
 /* ---------- 伝票 ---------- */
 .ticket {
   position: relative;
@@ -190,7 +221,7 @@ main { padding: 8px 32px 48px; }
 .ticket[data-state="waiting"] .clock, .ticket[data-state="stalled"] .clock { color: var(--call); }
 .ticket[data-state="yours"] .clock .state { color: var(--turn); }
 .ticket[data-state="working"] .clock { color: var(--work); }
-.grid-work .clock .elapsed { font-size: 26px; }
+.ticket.compact .clock .elapsed { font-size: 26px; }
 
 .reason { grid-column: 1 / -1; margin: 8px 0 0; font-size: 14px; color: var(--ink-2); overflow-wrap: anywhere; }
 .ticket[data-state="waiting"] .reason, .ticket[data-state="stalled"] .reason { color: var(--call); font-weight: 500; }
@@ -205,7 +236,7 @@ main { padding: 8px 32px 48px; }
 }
 .say.handoff dd { color: var(--ink); }
 .say.handoff dt { color: var(--turn); font-weight: 600; }
-.grid-work .say dd { -webkit-line-clamp: 2; }
+.ticket.compact .say dd { -webkit-line-clamp: 2; }
 .say.skills dd { -webkit-line-clamp: 1; color: var(--ink-2); }
 
 .tools { grid-column: 1 / -1; margin: 8px 0 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--ink-3); }
@@ -335,7 +366,10 @@ dialog.detail::backdrop { background: rgb(20 28 30 / .35); }
   .controls { justify-content: flex-start; }
   main { padding: 4px 16px 40px; }
   .hint { margin: 12px 16px 0; }
-  .grid-you, .grid-work { grid-template-columns: 1fr; }
+  .grid-you, .grid-work, .grid-proj { grid-template-columns: 1fr; }
+  .arrange { justify-content: flex-start; }
+  .proj > h2::after { display: none; }
+  .proj .p-tally { flex-basis: 100%; }
   .row-btn, .hist .row-btn, .hits .row-btn { grid-template-columns: 1fr auto; }
   .r-where, .r-flag, .hist .r-time { display: none; }
   .ledger > li { grid-template-columns: 1fr; }

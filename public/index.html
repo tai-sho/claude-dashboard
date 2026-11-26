@@ -35,6 +35,13 @@
 
 <main>
   <div id="view-board">
+    <div class="arrange" role="group" aria-label="並べ方">
+      <span>並べ方</span>
+      <button data-arrange="project" aria-pressed="false">プロジェクト別</button>
+      <button data-arrange="state" aria-pressed="false">状態別</button>
+    </div>
+    <div id="board-projects"></div>
+    <div id="board-lanes">
     <section class="lane" aria-labelledby="h-you">
       <h2 id="h-you">あなたを待っている <span class="count num" id="c-you"></span></h2>
       <div class="grid-you" id="lane-you"></div>
@@ -47,6 +54,7 @@
       <h2 id="h-rest">寝かせている <span class="count num" id="c-rest"></span></h2>
       <ul class="rows" id="lane-rest"></ul>
     </section>
+    </div>
   </div>
 
   <div id="view-ledger" hidden>
