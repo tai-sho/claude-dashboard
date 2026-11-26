@@ -87,6 +87,14 @@ describe('hooks/statusline-tap.mjs', () => {
     assert.equal(r.stdout, 'not json');
   });
 
+  test('元の statusline が tap 自身でも呼び続けない', async () => {
+    const self = `${JSON.stringify(process.execPath)} ${JSON.stringify(TAP)}`;
+    fs.writeFileSync(path.join(STATE, 'statusline-original.json'), JSON.stringify({ command: self }));
+    const r = await tap({ rate_limits: limits(12, 20) });
+    assert.equal(r.code, 0);
+    assert.equal(r.stdout, '');
+  });
+
   test('元のコマンドが失敗しても exit 0', async () => {
     fs.writeFileSync(path.join(STATE, 'statusline-original.json'), JSON.stringify({ command: 'exit 3' }));
     assert.equal((await tap({ rate_limits: limits(12, 20) })).code, 0);

@@ -11,10 +11,12 @@ const settingsPath = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.hom
 const script = path.join(path.dirname(fileURLToPath(import.meta.url)), 'hooks', 'record.mjs');
 // シェルで展開されないよう単一引用符で囲む
 const shQuote = v => `'${String(v).replace(/'/g, `'\\''`)}'`;
-const command = `node ${shQuote(script)}`;
-// 自分が登録した hooks の見分け方。今のコマンドと完全に一致するか、以前の版の判定（フォルダ名が claude-dashboard の場合）に合うもの
+// 末尾のシェルコメントは自分の登録の印。フォルダ名や置き場所が変わっても見分けられるようにする
+const TAG = '# claude-dashboard:record';
+const command = `node ${shQuote(script)} ${TAG}`;
+// 印の無い以前の版の登録は、フォルダ名が claude-dashboard の場合だけ見分けられる
 const LEGACY_MARK = 'claude-dashboard/hooks/record.mjs';
-const isMine = h => h.command === command || String(h.command || '').includes(LEGACY_MARK);
+const isMine = h => [TAG, LEGACY_MARK].some(m => String(h.command || '').includes(m));
 // 登録するイベント。以前の版で登録した他のイベントの分は、再実行で取り除かれる
 const EVENTS = ['Notification', 'PermissionRequest', 'SessionEnd'];
 const LEGACY_EVENTS = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'];

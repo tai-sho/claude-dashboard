@@ -43,13 +43,15 @@ before(async () => {
   fs.writeFileSync(path.join(sb.claude, 'sessions', 'live.json'), JSON.stringify({ pid: process.pid, sessionId: 'live-1', cwd, status: 'idle', statusUpdatedAt: now - 30000 }));
 
   port = await freePort();
-  child = spawn(process.execPath, [path.join(ROOT, 'server.mjs')], { env: { ...process.env, PORT: String(port) }, stdio: ['ignore', 'pipe', 'pipe'] });
+  child = spawn(process.execPath, [path.join(ROOT, 'server.mjs')], { env: { ...process.env, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe'] });
+  let stderr = '';
+  child.stderr.on('data', d => { stderr += d; });
   // 索引ができるまで待つ
   for (let i = 0; i < 100; i++) {
     try { if ((await getJson('/api/history')).json.index.ready) return; } catch {}
     await new Promise(r => setTimeout(r, 100));
   }
-  throw new Error('server did not become ready');
+  throw new Error(`server did not become ready (exit ${child.exitCode})\n${stderr}`);
 });
 
 after(() => { child?.kill(); sb.cleanup(); });

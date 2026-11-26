@@ -36,7 +36,7 @@ describe('install-hooks.mjs', () => {
     assert.deepEqual(s.hooks.Stop, [other]);
     const hook = s.hooks.SessionEnd[0].hooks[0];
     assert.equal(hook.async, true);
-    assert.match(hook.command, /^node '.*record\.mjs'$/);
+    assert.match(hook.command, /^node '.*record\.mjs' # claude-dashboard:record$/);
     assert.equal(backups().length, 1);
 
     assert.equal((await runNode(INSTALL, { env, args: ['--remove'] })).code, 0);
@@ -57,6 +57,17 @@ describe('install-hooks.mjs', () => {
     assert.deepEqual(readSettings().hooks.PreToolUse, [other]);
   });
 
+  test('別の場所から登録した印付きの hooks も置き換える', async () => {
+    const elsewhere = { hooks: [{ type: 'command', command: "node '/elsewhere/dash/hooks/record.mjs' # claude-dashboard:record" }] };
+    fs.writeFileSync(SETTINGS, JSON.stringify({ hooks: { Notification: [elsewhere, other] } }));
+    await runNode(INSTALL, { env });
+    const cmds = readSettings().hooks.Notification.flatMap(g => g.hooks).map(h => h.command);
+    assert.ok(!cmds.some(c => c.includes('/elsewhere/')));
+    assert.ok(cmds.includes('echo other'));
+    await runNode(INSTALL, { env, args: ['--remove'] });
+    assert.deepEqual(readSettings().hooks, { Notification: [other] });
+  });
+
   test('settings.json が無くても作る', async () => {
     assert.equal((await runNode(INSTALL, { env })).code, 0);
     assert.ok(readSettings().hooks.Notification);
@@ -73,7 +84,7 @@ describe('install-usage.mjs', () => {
 
     assert.equal((await runNode(INSTALL, { env })).code, 0);
     const s = readSettings();
-    assert.match(s.statusLine.command, /^node '.*statusline-tap\.mjs'$/);
+    assert.match(s.statusLine.command, /^node '.*statusline-tap\.mjs' # claude-dashboard:statusline-tap$/);
     assert.equal(s.statusLine.padding, 1);
     assert.equal(s.theme, 'dark');
     assert.equal(JSON.parse(fs.readFileSync(ORIGINAL, 'utf8')).command, 'my-statusline --flag');
@@ -92,6 +103,13 @@ describe('install-usage.mjs', () => {
     assert.ok(readSettings().statusLine);
     await runNode(INSTALL, { env, args: ['--remove'] });
     assert.deepEqual(readSettings(), { theme: 'dark' });
+  });
+
+  test('別の場所の tap が挟まっていれば、それを元の statusline として退避しない', async () => {
+    fs.writeFileSync(SETTINGS, JSON.stringify({ statusLine: { type: 'command', command: "node '/elsewhere/dash/hooks/statusline-tap.mjs'" } }));
+    const r = await runNode(INSTALL, { env });
+    assert.match(r.stdout, /すでに挟まっています/);
+    assert.ok(!fs.existsSync(ORIGINAL));
   });
 
   test('挟まっていなければ --remove は何もしない', async () => {

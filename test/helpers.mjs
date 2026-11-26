@@ -18,6 +18,7 @@ export function sandboxEnv() {
   fs.mkdirSync(path.join(claude, 'sessions'), { recursive: true });
   process.env.HOME = home;
   process.env.CLAUDE_CONFIG_DIR = claude;
+  process.env.GIT_CEILING_DIRECTORIES = base; // 一時ディレクトリが Git 管理下にあっても、その外のリポジトリを見に行かない
   return { base, home, claude, cleanup: () => fs.rmSync(base, { recursive: true, force: true }) };
 }
 

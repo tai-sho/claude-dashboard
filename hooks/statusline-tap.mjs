@@ -32,11 +32,13 @@ try {
   }
 } catch { /* 記録できなくても続ける */ }
 
-// 元の statusline をそのまま実行する
+// 元の statusline をそのまま実行する。元のコマンドがこの tap 自身だった場合に呼び続けないよう、入れ子の起動では実行しない
+const GUARD = 'CLAUDE_DASHBOARD_STATUSLINE_TAP';
+if (process.env[GUARD]) process.exit(0);
 let original = null;
 try { original = JSON.parse(fs.readFileSync(ORIGINAL, 'utf8')); } catch {}
 if (!original?.command) process.exit(0);
-const child = spawn(original.command, { shell: true, stdio: ['pipe', 'inherit', 'inherit'] });
+const child = spawn(original.command, { shell: true, stdio: ['pipe', 'inherit', 'inherit'], env: { ...process.env, [GUARD]: '1' } });
 child.stdin.end(input);
 child.on('exit', () => process.exit(0));
 child.on('error', () => process.exit(0));
