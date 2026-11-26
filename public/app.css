@@ -473,6 +473,51 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
 }
 .ambient .amb-close:hover { color: var(--hud); border-color: rgb(255 255 255 / .35); }
 .ambient :focus-visible { outline-color: var(--beacon-work); }
+.ambient canvas { touch-action: none; }
+.amb-help { position: absolute; left: 32px; bottom: 22px; margin: 0; font-size: 12.5px; color: var(--hud-3); pointer-events: none; text-shadow: 0 1px 8px rgb(0 0 0 / .8); }
+
+/* 観測カード: 押した天体の様子。キャンバスの線がこのカードの左上につながる */
+.amb-card {
+  --tone: var(--hud-2);
+  position: absolute; right: 24px; top: 76px; width: min(360px, calc(100vw - 48px)); max-height: calc(100% - 128px); overflow: auto;
+  padding: 16px 20px 18px; border: 1px solid rgb(255 255 255 / .14); border-radius: 4px;
+  background: rgb(6 11 22 / .78); backdrop-filter: blur(10px); color: var(--hud);
+  box-shadow: 0 18px 48px rgb(0 0 0 / .45);
+}
+.amb-card [data-tone="call"] { --tone: var(--beacon-call); }
+.amb-card [data-tone="turn"] { --tone: var(--beacon-turn); }
+.amb-card [data-tone="work"] { --tone: var(--beacon-work); }
+.amb-card [data-tone="rest"] { --tone: var(--beacon-rest); }
+.ac-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.ac-crumb, .ac-x { border: 0; background: none; padding: 2px 0; cursor: pointer; font: inherit; font-size: 13px; color: var(--hud-3); }
+.ac-crumb { text-decoration: underline; text-decoration-color: rgb(255 255 255 / .2); text-underline-offset: 3px; overflow-wrap: anywhere; text-align: left; }
+.ac-crumb:hover, .ac-x:hover { color: var(--hud); }
+.ac-count { font-size: 13px; color: var(--hud-3); }
+.ac-name { margin: 0; font-size: 19px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.ac-state { display: flex; align-items: baseline; gap: 10px; margin: 8px 0 0; color: var(--tone); font-weight: 600; }
+.ac-state .num { font-size: 28px; line-height: 1; letter-spacing: -0.02em; }
+.ac-where, .ac-reason { margin: 6px 0 0; font-size: 13px; color: var(--hud-2); overflow-wrap: anywhere; }
+.ac-tools { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 12.5px; color: var(--hud-2); }
+.ac-tools li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-tools b { color: var(--beacon-work); font-weight: 600; margin-right: 8px; }
+.ac-say { margin: 14px 0 0; display: grid; gap: 10px; }
+.ac-say div { border-left: 2px solid rgb(255 255 255 / .14); padding-left: 10px; }
+.ac-say dt { font-size: 12px; color: var(--hud-3); }
+.ac-say dd { margin: 2px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--hud); white-space: pre-line; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; }
+.ac-actions { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgb(255 255 255 / .1); font-size: 13.5px; }
+.amb-card .act { color: var(--hud-2); text-decoration-color: rgb(255 255 255 / .25); }
+.amb-card .act:hover { color: var(--hud); text-decoration-color: currentColor; }
+.amb-card .act.primary { color: var(--hud); text-decoration-color: var(--beacon-turn); }
+.ac-list { margin: 10px 0 0; padding: 0; list-style: none; display: grid; }
+.ac-list button {
+  width: 100%; display: grid; grid-template-columns: 9px 1fr; column-gap: 10px; align-items: baseline; text-align: left;
+  border: 0; border-top: 1px solid rgb(255 255 255 / .08); background: none; padding: 9px 0; cursor: pointer; color: var(--hud); font: inherit;
+}
+.ac-list button::before { content: ""; grid-row: span 2; width: 8px; height: 8px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 8px var(--tone); align-self: center; }
+.ac-list button:hover .ac-l-name { text-decoration: underline; text-underline-offset: 3px; }
+.ac-l-name { font-size: 14px; overflow-wrap: anywhere; }
+.ac-l-state { font-size: 12.5px; color: var(--tone); }
 
 @media (max-width: 720px) {
   .views { gap: 18px; overflow-x: auto; overflow-y: hidden; }
@@ -480,6 +525,8 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
   .wcard.wide { grid-column: auto; }
   .amb-hud { left: 16px; top: 16px; }
   .ambient .amb-close { right: 16px; top: 16px; }
+  .amb-help { display: none; }
+  .amb-card { left: 16px; right: 16px; top: auto; bottom: 16px; width: auto; max-height: 46%; }
   .top { grid-template-columns: 1fr; padding: 20px 16px 0; }
   .controls { justify-content: flex-start; }
   main { padding: 4px 16px 40px; }

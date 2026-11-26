@@ -2,13 +2,17 @@
 // 依存を入れないため、Three.js ではなく Canvas 2D に透視投影を自前でかけて描く。
 // 惑星の表面は手続き的に作った模様を球に貼り、太陽ひとつの光で照らす（昼夜の境目・大気・雲・海の照り返し・環）。
 // 背景は星雲と天の川の全天パノラマで、カメラの回転と同じ角度で流れる。
+// ドラッグで回し、ホイールで寄る。天体をクリックするとカメラがそこへ寄り、右に観測カードを出す（盤面には戻らない）。
 // 誰かに呼ばれたら（app.js の detectChanges）自動で閉じて盤面に戻る。
 (() => {
   const CB = window.CB = window.CB || { views: {} };
   const TAU = Math.PI * 2;
   let el, canvas, open = false, raf = 0, clockTimer = 0;
   let planets = [], sats = [], stars = [], colors = {}, colorsAt = 0;
-  let cam = { yaw: 0, pitch: .36, dist: 0 }, hoverSat = null, lastT = 0, focal = 1, ringR = 0;
+  let cam = { yaw: 0, pitch: .36, dist: 0, t: [0, 0, 0], ox: 0, oy: 0 }, hoverSat = null, hoverPlanet = null, lastT = 0, focal = 1, ringR = 0;
+  // 観測の対象（{ kind: 'planet' | 'sat', key, planet }）と、ホイールで決めた寄り具合（1 で画面に収まる距離）
+  let focus = null, zoom = 1, drag = null, cardHtml = '';
+  const ZOOM_MIN = .25, ZOOM_MAX = 3, PITCH_MIN = -.15, PITCH_MAX = 1;
   const textures = new Map(); // プロジェクト → 表面の模様（作るのに時間がかかるので覚えておく）
   let nebula = null;
 
@@ -199,6 +203,9 @@
       });
     }
     if (!stars.length) stars = makeStars();
+    // 観測していたセッションが終わったら、その惑星の観測に切り替える。惑星もなくなったら観測をやめる
+    if (focus?.kind === 'sat' && !sats.some(x => x.id === focus.key)) focus = { kind: 'planet', key: focus.planet, planet: focus.planet };
+    if (focus && !planets.some(p => p.key === focus.planet)) focus = null;
   }
   // 表面の模様は、1フレームに1つずつ作る（開いた瞬間に固まらないように）
   function bakeOne() {
@@ -214,11 +221,13 @@
   // SUN は世界座標での光の向きで、毎フレーム draw() で更新する
   const LIGHT_CAM = (() => { const v = [-.62, -.42, -.66], n = Math.hypot(...v); return v.map(x => x / n); })();
   let SUN = LIGHT_CAM;
-  function toCam(x, y, z) {
+  // 向きの回転（光や視線などの方向に使う）。位置は toCam で注視点を引いてから回す
+  function rot(x, y, z) {
     const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
     const x1 = x * cy - z * sy, z1 = x * sy + z * cy;
     return [x1, y * cp - z1 * sp, y * sp + z1 * cp];
   }
+  const toCam = (x, y, z) => rot(x - cam.t[0], y - cam.t[1], z - cam.t[2]);
   function fromCam(x, y, z) {
     const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
     const y1 = y * cp + z * sp, z1 = -y * sp + z * cp;
@@ -229,7 +238,7 @@
     const d = z + cam.dist;
     if (d < 40) return null;
     const k = focal / d;
-    return { x: w / 2 + x * k, y: h * .55 + y * k, k, z: d };
+    return { x: w / 2 + cam.ox + x * k, y: h * .55 + cam.oy + y * k, k, z: d };
   }
   function satPos(sat, theta) {
     const p = sat.planet;
@@ -267,6 +276,8 @@
     const cloudShift = Math.floor(((p.spin * .18) % TAU) / TAU * TW);
     const V = fromCam(0, 0, -1); // 見ている向き（世界座標、惑星からカメラへ）
     const H = (() => { const v = [SUN[0] + V[0], SUN[1] + V[1], SUN[2] + V[2]], n = Math.hypot(...v); return v.map(x => x / n); })();
+    // カメラ座標 → 世界座標の回転を行列にしておく（画素ごとに三角関数を呼ばない）
+    const ex = fromCam(1, 0, 0), ey = fromCam(0, 1, 0), ez = fromCam(0, 0, 1);
     const flat = rgb(p.type === 'gas' ? '#b88a5c' : p.type === 'terran' ? '#2a5a7a' : p.type === 'ice' ? '#bcd6e3' : '#7d6d5d');
     for (let y = 0; y < size; y++) {
       const ny = (y + .5 - c0) / rPx;
@@ -274,7 +285,7 @@
         const nx = (x + .5 - c0) / rPx, d2 = nx * nx + ny * ny, k = (y * size + x) * 4;
         if (d2 >= 1) { d[k + 3] = 0; continue; }
         const nz = Math.sqrt(1 - d2);
-        const [wx, wy, wz] = fromCam(nx, ny, -nz); // 表面の向き（世界座標）
+        const wx = ex[0] * nx + ey[0] * ny - ez[0] * nz, wy = ex[1] * nx + ey[1] * ny - ez[1] * nz, wz = ex[2] * nx + ey[2] * ny - ez[2] * nz; // 表面の向き（世界座標）
         const lambert = wx * SUN[0] + wy * SUN[1] + wz * SUN[2];
         const light = .035 + .965 * smooth(-.12, .55, lambert) * clamp(lambert * .6 + .55);
         let c;
@@ -340,7 +351,8 @@
   function drawSky(g, w, h, t) {
     g.fillStyle = '#03060c'; g.fillRect(0, 0, w, h);
     // 角度1ラジアン = focal 画素。カメラが回った分だけ空も流れる
-    const hy = h * .55 - Math.tan(cam.pitch) * focal; // 地平の高さ
+    // 上下の傾きは空を少し控えめに動かす（大きく見上げ・見下ろししてもパノラマが画面から外れないように）
+    const hy = h * .55 - (Math.tan(.36) + (cam.pitch - .36) * .5) * focal; // 地平の高さ
     if (nebula) {
       const pw = TAU * focal, ph = 2 * N_ELEV * focal;
       let ox = -((cam.yaw / TAU) % 1) * pw; if (ox > 0) ox -= pw;
@@ -397,23 +409,77 @@
       strokeHalf(g, Array.from({ length: 97 }, (_, i) => project(ringPoint(p, rad, i / 96 * TAU), w, h)), q.z, front);
     }
   }
-  function drawOrbit(g, sat, q, w, h, front, c) {
+  function drawOrbit(g, sat, q, w, h, front, c, k) {
     g.strokeStyle = called(sat.s) ? c.call : c.ink2;
-    g.globalAlpha = called(sat.s) ? .5 : front ? .22 : .1;
+    g.globalAlpha = (called(sat.s) ? .5 : front ? .22 : .1) * k;
     g.lineWidth = 1;
     strokeHalf(g, Array.from({ length: 97 }, (_, i) => project(satPos(sat, i / 96 * TAU), w, h)), q.z, front);
+    g.globalAlpha = k;
+  }
+
+  const focusPlanet = () => (focus ? planets.find(p => p.key === focus.planet) : null);
+  const focusSat = () => (focus?.kind === 'sat' ? sats.find(x => x.id === focus.key) : null);
+  // 観測カードの置き場所（幅が狭いときは下）。カメラはカードを除いた残りの真ん中に天体を置く
+  function cardBox(w, h) {
+    const card = CB.$('amb-card');
+    if (!focus || card.hidden) return null;
+    const r = card.getBoundingClientRect(), c = canvas.getBoundingClientRect();
+    return { x: r.left - c.left, y: r.top - c.top, w: r.width, h: r.height, below: w <= 720 };
+  }
+  // カメラの行き先を決め、a（0〜1）の割合だけ近づける
+  function settle(w, h, a) {
+    const box = cardBox(w, h), fp = focusPlanet();
+    let want, tgt = [0, 0, 0], ox = 0, oy = 0;
+    if (fp) {
+      const availW = box && !box.below ? w - box.w - 24 : w, availH = box?.below ? h - box.h - 16 : h;
+      const outer = Math.max(fp.r * (fp.ring ? 2.1 : 1.4), ...sats.filter(x => x.planet === fp).map(x => x.r)) + 18;
+      want = Math.max(fp.r * 2.6 + 40, outer * focal / (Math.min(availW, availH) * .42) + outer) * zoom;
+      tgt = [fp.x, fp.y, fp.z];
+      if (box && !box.below) ox = -(box.w + 24) / 2;
+      if (box?.below) oy = (h - box.h - 16) / 2 - h * .55;
+    } else {
+      // 惑星の並ぶ輪が画面の幅と高さに収まる距離までカメラを引く
+      const outer = ringR + 120;
+      want = Math.max(300, Math.max(600, ringR * 1.45 + 420, outer * focal / (w * .4) + outer * .5, outer * focal * Math.sin(Math.max(.2, cam.pitch)) / (h * .3) + outer) * zoom);
+    }
+    if (!cam.dist) a = 1;
+    cam.dist += (want - cam.dist) * a;
+    for (let i = 0; i < 3; i++) cam.t[i] += (tgt[i] - cam.t[i]) * a;
+    cam.ox += (ox - cam.ox) * a; cam.oy += (oy - cam.oy) * a;
+  }
+  // 観測中の天体を四隅の括弧で囲み、カードまで細い線を引く
+  function drawLeader(g, w, h, c) {
+    const box = cardBox(w, h), fp = focusPlanet(), fs = focusSat();
+    const q = fs ? fs.q : fp?.q;
+    if (!q) return;
+    const col = fs ? satColor(c, fs.s) : c.ink2;
+    const rr = fs ? 13 : fp.r * q.k * (fp.ring ? 1.3 : 1) + 12, arm = Math.min(10, rr * .5);
+    g.strokeStyle = col; g.lineWidth = 1.5; g.globalAlpha = .9;
+    g.beginPath();
+    for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      g.moveTo(q.x + sx * rr, q.y + sy * (rr - arm)); g.lineTo(q.x + sx * rr, q.y + sy * rr); g.lineTo(q.x + sx * (rr - arm), q.y + sy * rr);
+    }
+    g.stroke();
+    if (box) {
+      g.lineWidth = 1; g.globalAlpha = .5; g.beginPath();
+      if (box.below) {
+        const ex = clamp(q.x, box.x + 24, box.x + box.w - 24), ey = box.y - 1;
+        g.moveTo(q.x, q.y + rr); g.lineTo(q.x, ey - 18); g.lineTo(ex, ey - 18); g.lineTo(ex, ey);
+      } else {
+        const ex = box.x - 1, ey = box.y + 30;
+        g.moveTo(q.x + rr, q.y - rr); g.lineTo(ex - 28, ey); g.lineTo(ex, ey);
+      }
+      g.stroke();
+    }
     g.globalAlpha = 1;
   }
 
-  function draw(t) {
+  function draw(t, a = 0) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); }
     focal = Math.min(w, h) * 1.2;
-    // 惑星の並ぶ輪が画面の幅と高さに収まる距離までカメラを引く（変わるときはなめらかに）
-    const outer = ringR + 120;
-    const want = Math.max(600, ringR * 1.45 + 420, outer * focal / (w * .4) + outer * .5, outer * focal * Math.sin(cam.pitch) / (h * .3) + outer);
-    cam.dist = cam.dist ? cam.dist + (want - cam.dist) * .08 : want;
+    settle(w, h, CB.reduceMotion.matches ? 1 : a);
     SUN = fromCam(...LIGHT_CAM);
     const g = canvas.getContext('2d');
     const c = readColors();
@@ -429,16 +495,20 @@
 
     // 奥から順に描く
     const items = [];
-    for (const p of planets) { const q = project(p, w, h); if (q) { p.q = q; items.push({ z: q.z, kind: 'planet', p, q }); } }
-    for (const sat of sats) { const q = project(satPos(sat, sat.theta), w, h); if (q) { sat.q = q; items.push({ z: q.z, kind: 'sat', sat, q }); } }
+    // カメラが近づきすぎた天体は描かない（画面いっぱいに広がって他を隠すため）
+    for (const p of planets) { const q = project(p, w, h); p.q = q && q.z > p.r * 2 ? q : null; if (p.q) items.push({ z: q.z, kind: 'planet', p, q }); }
+    for (const sat of sats) { const q = project(satPos(sat, sat.theta), w, h); sat.q = q; if (q) items.push({ z: q.z, kind: 'sat', sat, q }); }
+    // 観測中は、ほかの惑星とその衛星を少し暗くする
+    const fp = focusPlanet(), dim = p => (fp && p !== fp ? .4 : 1);
     items.sort((a, b) => b.z - a.z);
-    const sunCam = toCam(...SUN);
+    const sunCam = rot(...SUN);
     const sunDir = (() => { const n = Math.hypot(sunCam[0], sunCam[1]) || 1; return [sunCam[0] / n, sunCam[1] / n]; })();
 
     for (const it of items) {
       if (it.kind === 'planet') {
         const { p, q } = it, r = p.r * q.k;
-        for (const sat of sats) if (sat.planet === p && sat.q) drawOrbit(g, sat, p.q, w, h, false, c);
+        g.globalAlpha = dim(p);
+        for (const sat of sats) if (sat.planet === p && sat.q) drawOrbit(g, sat, p.q, w, h, false, c, dim(p));
         if (p.ring) drawRing(g, p, q, w, h, false);
         // 大気の外側の光（太陽の側に少し寄せる）
         const atm = ATM[p.type], ak = ATM_STRENGTH[p.type];
@@ -446,42 +516,45 @@
         const glow = g.createRadialGradient(gx, gy, r * .9, gx, gy, r * 1.35);
         glow.addColorStop(0, `rgba(${atm.join(',')},${.28 * ak})`); glow.addColorStop(1, `rgba(${atm.join(',')},0)`);
         g.fillStyle = glow; g.beginPath(); g.arc(gx, gy, r * 1.35, 0, TAU); g.fill();
-        const sprite = renderPlanet(p, r * dpr);
-        g.drawImage(sprite, q.x - sprite.width / dpr / 2, q.y - sprite.height / dpr / 2, sprite.width / dpr, sprite.height / dpr);
+        g.globalAlpha = dim(p);
+        // 寄ったときは模様の細かさ以上に画素を増やしても見た目が変わらないので、半径 170 画素までで焼いて引き伸ばす
+        const rPx = Math.min(r * dpr, 170), sprite = renderPlanet(p, rPx), S = sprite.width * r / rPx;
+        g.drawImage(sprite, q.x - S / 2, q.y - S / 2, S, S);
         if (p.ring) drawRing(g, p, q, w, h, true);
-        for (const sat of sats) if (sat.planet === p && sat.q) drawOrbit(g, sat, p.q, w, h, true, c);
-        if (p.sessions.some(called)) { g.strokeStyle = c.call; g.globalAlpha = .7; g.lineWidth = 1.5; g.beginPath(); g.arc(q.x, q.y, r + 6, 0, TAU); g.stroke(); g.globalAlpha = 1; }
-        g.fillStyle = c.ink; g.font = `600 ${Math.round(Math.max(12, 13 * q.k * 1.3))}px "IBM Plex Sans JP", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'top';
+        for (const sat of sats) if (sat.planet === p && sat.q) drawOrbit(g, sat, p.q, w, h, true, c, dim(p));
+        if (p.sessions.some(called)) { g.strokeStyle = c.call; g.globalAlpha = .7 * dim(p); g.lineWidth = 1.5; g.beginPath(); g.arc(q.x, q.y, r + 6, 0, TAU); g.stroke(); }
+        g.globalAlpha = dim(p);
+        g.fillStyle = c.ink; g.font = `600 ${Math.round(clamp(13 * q.k * 1.3, 12, 22))}px "IBM Plex Sans JP", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'top';
         g.shadowColor = 'rgba(0,0,0,.8)'; g.shadowBlur = 6;
         g.fillText(short(p.name, 26), q.x, q.y + r * (p.ring ? 1.25 : 1) + 10);
-        g.shadowBlur = 0;
+        g.shadowBlur = 0; g.globalAlpha = 1;
         continue;
       }
       // 衛星は状態の色で光る灯り
-      const { sat, q } = it, s = sat.s, col = satColor(c, s), lane = laneOf(s);
-      const r = Math.max(1.8, (lane === 'you' ? 4.2 : lane === 'work' ? 3.4 : 2.4) * q.k * 1.4);
+      const { sat, q } = it, s = sat.s, col = satColor(c, s), lane = laneOf(s), dk = dim(sat.planet);
+      const r = clamp((lane === 'you' ? 4.2 : lane === 'work' ? 3.4 : 2.4) * q.k * 1.4, 1.8, 9);
       g.globalCompositeOperation = 'lighter';
       if (lane === 'work') { // 尾を引く
         for (let i = 1; i <= 16; i++) {
           const tq = project(satPos(sat, sat.theta - i * .03), w, h);
           if (!tq) continue;
-          g.globalAlpha = (1 - i / 17) * .35; g.fillStyle = col;
+          g.globalAlpha = (1 - i / 17) * .35 * dk; g.fillStyle = col;
           g.beginPath(); g.arc(tq.x, tq.y, r * (1 - i / 20), 0, TAU); g.fill();
         }
       }
       const glow = g.createRadialGradient(q.x, q.y, 0, q.x, q.y, r * 5);
       glow.addColorStop(0, col); glow.addColorStop(1, 'rgba(0,0,0,0)');
-      g.globalAlpha = lane === 'rest' ? .2 : .55; g.fillStyle = glow;
+      g.globalAlpha = (lane === 'rest' ? .2 : .55) * dk; g.fillStyle = glow;
       g.beginPath(); g.arc(q.x, q.y, r * 5, 0, TAU); g.fill();
-      g.globalAlpha = 1; g.fillStyle = col; g.beginPath(); g.arc(q.x, q.y, r, 0, TAU); g.fill();
+      g.globalAlpha = dk; g.fillStyle = col; g.beginPath(); g.arc(q.x, q.y, r, 0, TAU); g.fill();
       g.fillStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.arc(q.x, q.y, r * .45, 0, TAU); g.fill();
-      g.globalCompositeOperation = 'source-over';
+      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
       if (lane === 'you') { // 呼んでいる衛星は波紋を出す
         const ph = (t / (called(s) ? 1100 : 2400)) % 1;
         g.strokeStyle = col; g.lineWidth = 1.5; g.globalAlpha = (1 - ph) * .9;
         g.beginPath(); g.arc(q.x, q.y, r + 3 + ph * 24, 0, TAU); g.stroke(); g.globalAlpha = 1;
       }
-      if (lane === 'you' || hoverSat === sat) {
+      if ((lane === 'you' && dk === 1) || hoverSat === sat || (fp === sat.planet && focus.kind === 'planet')) {
         // 惑星より左にいるときは名前を左側に出し、同じ惑星の衛星どうしで重なりにくくする
         const left = sat.planet.q && q.x < sat.planet.q.x;
         const lx = left ? q.x - r - 12 : q.x + r + 12;
@@ -493,6 +566,7 @@
         g.shadowBlur = 0;
       }
     }
+    if (focus) drawLeader(g, w, h, c);
   }
 
   function frame(t) {
@@ -500,11 +574,11 @@
     if (!open || document.hidden) return;
     const dt = Math.min(.1, lastT ? (t - lastT) / 1000 : 0);
     lastT = t;
-    cam.yaw += dt * .03;
+    if (!drag?.moved) cam.yaw += dt * .03; // つかんで回している間は自転を止める
     for (const sat of sats) sat.theta += dt * speed(sat.s);
     for (const p of planets) p.spin += dt * p.spinRate;
     bakeOne();
-    draw(t);
+    draw(t, 1 - Math.exp(-dt * 4));
     raf = requestAnimationFrame(frame);
   }
   function kick() {
@@ -522,15 +596,100 @@
     CB.$('amb-clock').textContent = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
     const v = CB.$('verdict'), av = CB.$('amb-verdict');
     av.textContent = v.textContent; av.dataset.tone = v.dataset.tone || 'calm';
+    tickCard();
     if (CB.reduceMotion.matches) draw(0);
   }
 
+  // ---------- 観測カード ----------
+  const TONE = s => { const lane = laneOf(s); return lane === 'you' ? (s.state.key === 'yours' ? 'turn' : 'call') : lane === 'work' ? 'work' : 'rest'; };
+  const sinceHtml = s => `<span class="num" data-since="${CB.esc(CB.since(s))}"></span>`;
+  function satCard(sat) {
+    const { esc } = CB, s = sat.s, st = s.state;
+    const prompt = CB.plain(s.lastPrompt), handoffFresh = s.handoff && s.handoff.at >= (s.lastPromptAt || 0);
+    const reply = handoffFresh || st.key === 'working' ? '' : CB.plain(s.lastReply);
+    const say = [
+      prompt && ['依頼', prompt],
+      handoffFresh && st.key !== 'working' && ['引き継ぎ', s.handoff.text],
+      reply && ['返答', reply],
+    ].filter(Boolean);
+    const tools = st.key === 'working' ? (s.recentTools || []).slice(0, 3) : [];
+    return `
+      <div class="ac-top"><button class="ac-crumb" data-planet="${esc(sat.planet.key)}" title="このプロジェクトのセッション一覧">${esc(sat.planet.name)}</button>
+        <button class="ac-x" data-unfocus aria-label="観測をやめる">閉じる</button></div>
+      <h2 class="ac-name">${esc(s.name)}</h2>
+      <p class="ac-state" data-tone="${TONE(s)}">${sinceHtml(s)}<span>${esc(st.label)}</span></p>
+      ${CB.where(s, true) ? `<p class="ac-where">${CB.where(s, true)}</p>` : ''}
+      ${st.key !== 'yours' && st.reason && !tools.length ? `<p class="ac-reason">${esc(st.reason)}</p>` : ''}
+      ${tools.length ? `<ul class="ac-tools">${tools.map(t => `<li><b>${esc(t.name)}</b>${esc(t.detail)}</li>`).join('')}</ul>` : ''}
+      ${say.length ? `<dl class="ac-say">${say.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
+      <div class="ac-actions">${CB.openActions(s)}<button class="act" data-detail="${esc(s.sessionId)}">経緯をすべて見る</button></div>`;
+  }
+  function planetCard(p) {
+    const { esc } = CB;
+    const order = { call: 0, turn: 1, work: 2, rest: 3 };
+    // 並びは状態と名前で決める（時刻で並べると更新のたびに入れ替わり、押そうとした行がずれる）
+    const list = sats.filter(x => x.planet === p).sort((a, b) => order[TONE(a.s)] - order[TONE(b.s)] || a.s.name.localeCompare(b.s.name, 'ja'));
+    return `
+      <div class="ac-top"><span class="ac-count num">${list.length}件のセッション</span>
+        <button class="ac-x" data-unfocus aria-label="観測をやめる">閉じる</button></div>
+      <h2 class="ac-name">${esc(p.name)}</h2>
+      <ul class="ac-list">${list.map(x => `<li><button data-sat="${esc(x.id)}" data-tone="${TONE(x.s)}">
+        <span class="ac-l-name">${esc(x.s.name)}</span><span class="ac-l-state">${esc(x.s.state.label)}　${sinceHtml(x.s)}</span></button></li>`).join('')}</ul>`;
+  }
+  function renderCard() {
+    const card = CB.$('amb-card');
+    const fs = focusSat(), fp = focusPlanet();
+    const html = !focus ? '' : fs ? satCard(fs) : fp ? planetCard(fp) : '';
+    card.hidden = !html;
+    if (html !== cardHtml) { // 変わったときだけ差し替える（押しかけのボタンやスクロール位置を保つ）
+      const keep = card.contains(document.activeElement) ? document.activeElement.dataset : null;
+      card.innerHTML = cardHtml = html;
+      if (keep) card.querySelector(keep.sat ? `[data-sat="${CSS.escape(keep.sat)}"]` : keep.planet ? '[data-planet]' : '[data-unfocus]')?.focus();
+      if (!(keep?.sat)) card.scrollTop = 0;
+    }
+    tickCard();
+  }
+  function tickCard() {
+    for (const n of CB.$('amb-card').querySelectorAll('[data-since]')) {
+      const e = CB.elapsed(Date.now() - Number(n.dataset.since));
+      n.textContent = `${e.n}${e.u}`;
+    }
+  }
+  function setFocus(f) {
+    if ((f?.planet || null) !== (focus?.planet || null)) zoom = 1; // 別の天体に移ったら寄り具合を戻す
+    focus = f;
+    renderCard();
+    if (CB.reduceMotion.matches) draw(0); else kick();
+  }
+
+  // ---------- 操作 ----------
+  function pointer(ev) { const r = canvas.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; }
   function pickSat(ev) {
-    const r = canvas.getBoundingClientRect();
-    const mx = ev.clientX - r.left, my = ev.clientY - r.top;
+    const [mx, my] = pointer(ev);
     let best = null, bd = 22;
     for (const sat of sats) { if (!sat.q) continue; const d = Math.hypot(sat.q.x - mx, sat.q.y - my); if (d < bd) { bd = d; best = sat; } }
     return best;
+  }
+  function pickPlanet(ev) {
+    const [mx, my] = pointer(ev);
+    let best = null, bz = Infinity;
+    for (const p of planets) { if (!p.q) continue; if (Math.hypot(p.q.x - mx, p.q.y - my) < p.r * p.q.k + 8 && p.q.z < bz) { bz = p.q.z; best = p; } }
+    return best;
+  }
+  function pick(ev) {
+    const sat = pickSat(ev);
+    if (sat) return setFocus({ kind: 'sat', key: sat.id, planet: sat.planet.key });
+    const p = pickPlanet(ev);
+    if (p) return setFocus({ kind: 'planet', key: p.key, planet: p.key });
+    if (focus) setFocus(null); // 何もないところを押したら観測をやめて全体に戻る
+  }
+  function zoomBy(f) {
+    zoom = clamp(zoom * f, ZOOM_MIN, ZOOM_MAX);
+    if (CB.reduceMotion.matches) draw(0);
+  }
+  function turn(dyaw, dpitch) {
+    cam.yaw += dyaw; cam.pitch = clamp(cam.pitch + dpitch, PITCH_MIN, PITCH_MAX);
+    if (CB.reduceMotion.matches) draw(0);
   }
 
   const api = {
@@ -538,9 +697,51 @@
       el = cb.$('ambient'); canvas = cb.$('ambient-canvas');
       cb.$('ambient-open').onclick = () => api.open();
       cb.$('ambient-close').onclick = () => api.close();
-      document.addEventListener('keydown', e => { if (open && e.key === 'Escape') api.close(); });
-      canvas.addEventListener('mousemove', ev => { hoverSat = pickSat(ev); canvas.style.cursor = hoverSat ? 'pointer' : 'default'; if (CB.reduceMotion.matches) draw(0); });
-      canvas.addEventListener('click', ev => { const s = pickSat(ev); if (s) { api.close(); cb.openDetail(s.id); } });
+      document.addEventListener('keydown', e => {
+        if (!open || cb.$('detail').open) return; // 詳細パネルが開いているときはそちらが先
+        if (e.target.closest?.('input, textarea')) return;
+        if (e.key === 'Escape') { if (focus) setFocus(null); else api.close(); return; }
+        const k = { '+': () => zoomBy(1 / 1.25), '=': () => zoomBy(1 / 1.25), '-': () => zoomBy(1.25),
+          ArrowLeft: () => turn(.12, 0), ArrowRight: () => turn(-.12, 0), ArrowUp: () => turn(0, -.08), ArrowDown: () => turn(0, .08) }[e.key];
+        if (k && !e.target.closest?.('button, a')) { e.preventDefault(); k(); }
+      });
+      // ドラッグで回す。ほとんど動かさずに離したらクリックとして扱う
+      canvas.addEventListener('pointerdown', ev => {
+        if (ev.button !== 0) return;
+        drag = { x: ev.clientX, y: ev.clientY, lx: ev.clientX, ly: ev.clientY, moved: false };
+        canvas.setPointerCapture(ev.pointerId);
+      });
+      canvas.addEventListener('pointermove', ev => {
+        if (drag) {
+          if (!drag.moved && Math.hypot(ev.clientX - drag.x, ev.clientY - drag.y) > 4) { drag.moved = true; hoverSat = null; canvas.style.cursor = 'grabbing'; }
+          if (drag.moved) turn((ev.clientX - drag.lx) * .005, (ev.clientY - drag.ly) * .004);
+          drag.lx = ev.clientX; drag.ly = ev.clientY;
+          return;
+        }
+        hoverSat = pickSat(ev); hoverPlanet = hoverSat ? null : pickPlanet(ev);
+        canvas.style.cursor = hoverSat || hoverPlanet ? 'pointer' : 'grab';
+        if (CB.reduceMotion.matches) draw(0);
+      });
+      const endDrag = ev => {
+        if (!drag) return;
+        const click = !drag.moved && ev.type === 'pointerup';
+        drag = null; canvas.style.cursor = 'grab';
+        if (click) pick(ev);
+      };
+      canvas.addEventListener('pointerup', endDrag);
+      canvas.addEventListener('pointercancel', endDrag);
+      canvas.addEventListener('wheel', ev => {
+        ev.preventDefault();
+        const dy = ev.deltaMode === 1 ? ev.deltaY * 16 : ev.deltaY;
+        zoomBy(Math.exp(clamp(dy, -120, 120) * (ev.ctrlKey ? .01 : .0015))); // ctrlKey はトラックパッドのつまむ操作
+      }, { passive: false });
+      cb.$('amb-card').addEventListener('click', ev => {
+        const b = ev.target.closest('[data-sat],[data-planet],[data-unfocus]');
+        if (!b) return;
+        if (b.dataset.sat) { const sat = sats.find(x => x.id === b.dataset.sat); if (sat) setFocus({ kind: 'sat', key: sat.id, planet: sat.planet.key }); }
+        else if (b.dataset.planet) setFocus({ kind: 'planet', key: b.dataset.planet, planet: b.dataset.planet });
+        else setFocus(null);
+      });
       document.addEventListener('visibilitychange', kick);
       window.addEventListener('resize', kick);
       const cs = getComputedStyle(el);
@@ -554,6 +755,8 @@
       const d = CB.getData();
       if (d) build(d);
       open = true; el.hidden = false;
+      focus = null; zoom = 1; cam.dist = 0; cam.t = [0, 0, 0]; cam.ox = cam.oy = 0; renderCard();
+      canvas.style.cursor = 'grab';
       hud(); clearInterval(clockTimer); clockTimer = setInterval(hud, 1000);
       CB.$('ambient-close').focus();
       kick();
@@ -561,9 +764,10 @@
     close() {
       if (!open) return;
       open = false; el.hidden = true; clearInterval(clockTimer);
+      focus = null; drag = null; renderCard();
       CB.$('ambient-open').focus();
     },
-    update(d) { if (open) { build(d); hud(); kick(); } },
+    update(d) { if (open) { build(d); renderCard(); hud(); kick(); } },
   };
   CB.ambient = api;
 })();

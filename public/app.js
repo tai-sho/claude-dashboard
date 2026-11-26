@@ -551,7 +551,7 @@
 
   // ---------- 別ファイルの画面に渡す道具 ----------
   const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  Object.assign(CB, { $, esc, ago, hhmm, dayKey, dayLabel, elapsed, getJson, openDetail, cssVar, laneOf, since, reduceMotion, getData: () => data });
+  Object.assign(CB, { $, esc, plain, where, openActions, ago, hhmm, dayKey, dayLabel, elapsed, getJson, openDetail, cssVar, laneOf, since, reduceMotion, getData: () => data });
   for (const v of Object.values(CB.views)) v.init?.(CB);
   CB.ambient?.init?.(CB);
 
