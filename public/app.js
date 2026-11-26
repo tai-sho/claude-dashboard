@@ -136,13 +136,16 @@
   // プロジェクト別: 呼ばれている度合いの高いプロジェクトを上に。中は 待っている → 作業中 → 寝かせている
   function renderProjects(lanes) {
     const groups = new Map();
-    const at = key => {
-      if (!groups.has(key)) groups.set(key, { name: key, you: [], work: [], rest: [], calls: 0, last: 0 });
+    // 表示名（フォルダ名）が同じでも別のリポジトリは分ける。worktree は元のリポジトリにまとめる
+    const rootOf = s => (s.cwd && s.project !== 'No folder' ? s.cwd.replace(/\/\.claude\/worktrees\/[^/]+.*$/, '') : '');
+    const at = s => {
+      const root = rootOf(s), key = root || s.project || '不明';
+      if (!groups.has(key)) groups.set(key, { name: s.project || '不明', root, you: [], work: [], rest: [], calls: 0, last: 0 });
       return groups.get(key);
     };
     for (const lane of ['you', 'work', 'rest']) {
       for (const s of lanes[lane]) {
-        const g = at(s.project || '不明');
+        const g = at(s);
         g[lane].push(s);
         if (lane === 'you' && s.state.key !== 'yours') g.calls++;
         g.last = Math.max(g.last, s.lastActivityAt || 0);
@@ -151,7 +154,11 @@
     const rank = g => (g.calls ? 0 : g.you.length ? 1 : g.work.length ? 2 : 3);
     const list = [...groups.values()].sort((a, b) => rank(a) - rank(b) || b.last - a.last);
     if (!list.length) return '<p class="lane-empty">稼働中のセッションはありません。</p>';
+    const named = {};
+    for (const g of list) named[g.name] = (named[g.name] || 0) + 1;
     return list.map((g, i) => {
+      const parent = g.root.split('/').slice(-2, -1)[0];
+      const label = named[g.name] > 1 && parent ? `${g.name}（${parent}）` : g.name;
       const tally = [
         g.you.length ? `<span class="pc" data-tone="${g.calls ? 'call' : 'turn'}">待っている <b class="num">${g.you.length}</b></span>` : '',
         g.work.length ? `<span class="pc" data-tone="work">作業中 <b class="num">${g.work.length}</b></span>` : '',
@@ -159,23 +166,28 @@
       ].join('');
       const cards = [...g.you.map(s => ticket(s, true, true)), ...g.work.map(s => ticket(s, false, true))].join('');
       return `<section class="proj" data-rank="${rank(g)}" aria-labelledby="p-${i}">
-        <h2 id="p-${i}"><span class="p-name">${esc(g.name)}</span><span class="p-tally">${tally}</span></h2>
+        <h2><span class="p-name" id="p-${i}"${g.root ? ` title="${esc(g.root)}"` : ''}>${esc(label)}</span><span class="p-tally">${tally}</span></h2>
         ${cards ? `<div class="grid-proj">${cards}</div>` : ''}
         ${g.rest.length ? `<ul class="rows">${g.rest.map(s => restRow(s, true)).join('')}</ul>` : ''}
       </section>`;
     }).join('');
   }
 
+  // 並べ方の表示は、データが届く前（接続できないときも含む）から合わせておく
+  function syncArrange() {
+    for (const b of document.querySelectorAll('[data-arrange]')) b.setAttribute('aria-pressed', b.dataset.arrange === arrange);
+    $('board-lanes').hidden = arrange !== 'state';
+    $('board-projects').hidden = arrange !== 'project';
+  }
+
   function renderBoard() {
+    syncArrange();
     if (!data) return;
     const lanes = { you: [], work: [], rest: [] };
     for (const s of data.sessions) lanes[laneOf(s)].push(s);
     lanes.you.sort((a, b) => ((a.state.key === 'yours') - (b.state.key === 'yours')) || since(a) - since(b));
     lanes.rest.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
 
-    for (const b of document.querySelectorAll('[data-arrange]')) b.setAttribute('aria-pressed', b.dataset.arrange === arrange);
-    $('board-lanes').hidden = arrange !== 'state';
-    $('board-projects').hidden = arrange !== 'project';
     if (arrange === 'project') {
       $('board-projects').innerHTML = renderProjects(lanes);
     } else {
@@ -472,6 +484,7 @@
   $('sound').onclick = () => { soundOn = !soundOn; store.set('sound', soundOn); syncControls(); if (soundOn) { audioCtx ||= new AudioContext(); audioCtx.resume(); chime(false); } };
   $('notify').onclick = async () => { await Notification.requestPermission(); syncControls(); };
   syncControls();
+  syncArrange();
 
   // ---------- 画面切り替え ----------
   function route() {
