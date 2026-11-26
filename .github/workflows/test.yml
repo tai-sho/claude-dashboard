@@ -22,5 +22,5 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - name: Syntax check
-        run: for f in server.mjs install-*.mjs lib/*.mjs hooks/*.mjs public/app.js; do node --check "$f"; done
+        run: for f in server.mjs install-*.mjs lib/*.mjs hooks/*.mjs public/js/*.js; do node --check "$f"; done
       - run: npm test
