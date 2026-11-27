@@ -1,7 +1,7 @@
 // ふりかえりの集計（稼働帯・同時作業の本数・週のまとめ）
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { segmentsOf, peakConcurrency, weekStats } from '../lib/review.mjs';
+import { segmentsOf, blocksOf, peakConcurrency, weekStats } from '../lib/review.mjs';
 
 const M = 60000;
 const T0 = Date.UTC(2026, 0, 5, 1, 0, 0);
@@ -37,6 +37,18 @@ describe('segmentsOf', () => {
     const long = [{ kind: 'prompt', at: T0 }, { kind: 'reply', at: T0 + M }, { kind: 'prompt', at: T0 + 9 * 60 * M }, { kind: 'reply', at: T0 + 9 * 60 * M + M }];
     assert.deepEqual(segmentsOf(long, { to: T0 + 10 * 60 * M }).map(s => s[2]), ['w', 'w']);
   });
+});
+
+test('blocksOf は30分未満のあなたの番でつながる作業をひとまとまりにする', () => {
+  const segs = [
+    [0, 10 * M, 'w'], [10 * M, 25 * M, 't'], [25 * M, 40 * M, 'w'], // 15分の間 → つなげる
+    [40 * M, 100 * M, 't'], [100 * M, 110 * M, 'w'],                  // 60分の間 → 分ける
+  ];
+  assert.deepEqual(blocksOf(segs), [
+    { start: 0, end: 40 * M, work: [[0, 10 * M], [25 * M, 40 * M]] },
+    { start: 100 * M, end: 110 * M, work: [[100 * M, 110 * M]] },
+  ]);
+  assert.deepEqual(blocksOf([[0, M, 't']]), []);
 });
 
 test('peakConcurrency は同時に作業していた本数の最大を返す', () => {
