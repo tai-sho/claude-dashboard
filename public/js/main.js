@@ -7,8 +7,8 @@
 //   update(d)  その画面を開いているあいだに新しい状態が届いたとき
 // 呼び出し盤は、ほかの画面を開いていても見出しの件数やタブの題名を更新するため、常に描く。
 import { $, toast } from './dom.js';
-import { getData, setData, ack } from './live.js';
-import { initBoard, renderBoard, detectChanges, settle, setArrange } from './board.js';
+import { getData, setData } from './live.js';
+import { initBoard, renderBoard, detectChanges, setArrange, ackTicket } from './board.js';
 import { initAlerts, alertUser } from './alerts.js';
 import { renderMeters, usageView } from './usage.js';
 import { ledgerView } from './ledger.js';
@@ -50,7 +50,7 @@ document.addEventListener('click', async e => {
   if (el.dataset.arrange) { setArrange(el.dataset.arrange); return; }
   if (el.dataset.detail) { openDetail(el.dataset.detail, el.dataset.q); return; }
   if (el.dataset.ack) {
-    ack(el.dataset.ack);
+    ackTicket(el.dataset.ack);
     announce(detectChanges()); renderBoard(); toast('寝かせているに移しました');
   } else if (el.dataset.copy) {
     try { await navigator.clipboard.writeText(el.dataset.copy); toast(el.dataset.copied || 'コピーしました'); } catch { toast('コピーできませんでした'); }
@@ -65,7 +65,7 @@ function connect() {
   es.onopen = () => { $('live').textContent = '更新中'; delete $('live').dataset.off; };
   es.onmessage = ev => {
     setData(JSON.parse(ev.data));
-    announce(detectChanges()); renderBoard(); renderMeters(); settle();
+    announce(detectChanges()); renderBoard(); renderMeters();
     views[currentView]?.update?.(getData());
     ambient.update(getData());
   };
