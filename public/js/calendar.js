@@ -37,7 +37,7 @@ export function shift(mode, anchor, dir) {
 
 // セッションのまとまりを日ごとに切り分ける → Map(日の始まり → [まとまり])
 // まとまり: { sessionId, name, project, key, start, end, work: [[開始, 終了]], running }
-// running: 稼働中で、今も作業が続いているもの
+// running: 今も Claude の作業が続いているもの（サーバーが working を付けたセッションの最後のまとまり）
 export function piecesByDay(sessions, days, now = Date.now()) {
   const out = new Map(days.map(d => [d, []]));
   for (const s of sessions) {
@@ -48,7 +48,7 @@ export function piecesByDay(sessions, days, now = Date.now()) {
         if (b.end <= d || b.start >= e) continue;
         const start = Math.max(b.start, d), end = Math.min(b.end, e);
         const work = b.work.filter(([ws, we]) => we > start && ws < end).map(([ws, we]) => [Math.max(ws, start), Math.min(we, end)]);
-        out.get(d).push({ sessionId: s.sessionId, name: s.name, project: s.project, key, start, end, work, running: !!s.live && b.end >= now - 60000 && end === b.end });
+        out.get(d).push({ sessionId: s.sessionId, name: s.name, project: s.project, key, start, end, work, running: !!s.working && b.end >= now - 60000 && end === b.end });
       }
     }
   }

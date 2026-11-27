@@ -3,9 +3,10 @@ import { $, getJson, store, reduceMotion } from './dom.js';
 import { esc, hhmm, dayKey, dayLabel } from './format.js';
 import { MODES, rangeOf, shift, startOfDay, piecesByDay, layout, hourRange, daySummary, projectsIn, colorSlots, durText, workOf } from './calendar.js';
 
-let visible = false, seq = 0, timer = 0, counted = false;
+let visible = false, seq = 0, weekSeq = 0, timer = 0, counted = false;
 let mode = MODES.includes(store.get('cal-mode', 'day')) ? store.get('cal-mode', 'day') : 'day';
 let anchor = Date.now();
+let follow = true; // 今を含む期間を見ている（日付が変わったら今に合わせて進める）
 let slots = new Map(); // プロジェクト → 色の番号（描くたびに決め直す）
 const DOW = ['日', '月', '火', '水', '木', '金', '土'];
 const H = 3600000;
@@ -39,7 +40,7 @@ function timeGrid(r, days, byDay) {
   const axis = Array.from({ length: hi - lo }, (_, i) => `<li style="top:${i * hpx}px">${lo + i}時</li>`).join('');
   const head = mode === 'week' ? `<div class="cal-head"><span></span>${days.map(d => {
     const dt = new Date(d);
-    return `<button class="cal-dh ${dayTone(d)}${d === today ? ' today' : ''}" data-cal-day="${d}" title="この日を開く"><b class="num">${dt.getDate()}</b>${DOW[dt.getDay()]}</button>`;
+    return `<button class="cal-dh ${dayTone(d)}${d === today ? ' today' : ''}" data-cal-day="${d}" title="この日を開く"${d > r.now ? ' disabled' : ''}><b class="num">${dt.getDate()}</b>${DOW[dt.getDay()]}</button>`;
   }).join('')}</div>` : '';
   const cols = days.map(d => {
     const evs = layout(byDay.get(d), minMs).map(p => {
@@ -85,7 +86,8 @@ function calendar(r) {
   const tally = r.sessions.length
     ? `Claude が作業していた時間 <b class="num">${esc(durText(r.work))}</b>（のべ）　動いたセッション <b class="num">${esc(r.sessions.length)}</b>本${r.peak.peak > 1 ? `　いちばん多いときで <b class="num">${esc(r.peak.peak)}</b>本同時` : ''}`
     : '';
-  const inRange = r.now >= r.from && r.now < r.to;
+  const { from, to } = rangeOf(mode, anchor);
+  const inRange = r.now >= from && r.now < to;
   return `<div class="cal-bar">
       <h2 id="h-cal" class="cal-title">${esc(title(days))}</h2>
       <div class="cal-nav">
@@ -168,20 +170,25 @@ async function renderCalendar() {
   }
 }
 async function renderWeek() {
+  const my = ++weekSeq;
   const from = startOfDay(Date.now());
   let r;
   try { r = await getJson(`/api/review?from=${from}&days=7`); } catch { return; }
-  if (!visible) return;
+  if (my !== weekSeq || !visible) return;
   const el = $('rv-week');
   el.innerHTML = `<h2 id="h-week">この7日間 <span>${r.index.ready ? '' : '索引を作成中のため、一部だけの集計です'}</span></h2>${week(r.week)}`;
   countUp(el);
 }
 
-function go(dir) {
-  anchor = dir === 0 ? Date.now() : shift(mode, anchor, dir);
-  if (anchor > Date.now()) anchor = Date.now();
+// 見る期間を変える。今を含む期間なら、日付が変わったときに今へ合わせて進める
+function moveTo(t) {
+  const now = Date.now();
+  anchor = Math.min(t, now);
+  const { from, to } = rangeOf(mode, anchor);
+  follow = now >= from && now < to;
   renderCalendar();
 }
+const go = dir => moveTo(dir === 0 ? Date.now() : shift(mode, anchor, dir));
 
 export const reviewView = {
   init() {
@@ -190,8 +197,8 @@ export const reviewView = {
       const b = e.target.closest('[data-cal-go],[data-cal-mode],[data-cal-day]');
       if (!b || b.disabled) return;
       if (b.dataset.calGo) go(Number(b.dataset.calGo));
-      else if (b.dataset.calMode) { mode = b.dataset.calMode; store.set('cal-mode', mode); renderCalendar(); }
-      else { anchor = Number(b.dataset.calDay); mode = 'day'; store.set('cal-mode', mode); renderCalendar(); }
+      else if (b.dataset.calMode) { mode = b.dataset.calMode; store.set('cal-mode', mode); moveTo(anchor); }
+      else { mode = 'day'; store.set('cal-mode', mode); moveTo(Number(b.dataset.calDay)); }
     });
   },
   show() {
@@ -201,6 +208,7 @@ export const reviewView = {
     // 今を含む期間を見ているときだけ、作業中のまとまりを伸ばすために描き直す
     timer = setInterval(() => {
       if (document.hidden) return;
+      if (follow) anchor = Date.now();
       const { from, to } = rangeOf(mode, anchor);
       if (Date.now() >= from && Date.now() < to + 60000) renderCalendar();
       renderWeek();

@@ -193,7 +193,8 @@ describe('calendar', () => {
 
   test('piecesByDay は日をまたぐまとまりを日ごとに切り、作業中の区間も切る', () => {
     const days = rangeOf('week', at(27, 0)).days;
-    const by = piecesByDay([sess('a', [{ start: at(26, 22), end: at(27, 2), work: [[at(26, 23), at(27, 1)]] }], { live: true })], days, at(27, 2));
+    const blocks = [{ start: at(26, 22), end: at(27, 2), work: [[at(26, 23), at(27, 1)]] }];
+    const by = piecesByDay([sess('a', blocks, { live: true, working: true })], days, at(27, 2));
     const [p26] = by.get(at(26, 0)), [p27] = by.get(at(27, 0));
     assert.deepEqual([p26.start, p26.end, p26.work], [at(26, 22), at(27, 0), [[at(26, 23), at(27, 0)]]]);
     assert.deepEqual([p27.start, p27.end, p27.work], [at(27, 0), at(27, 2), [[at(27, 0), at(27, 1)]]]);
@@ -201,6 +202,8 @@ describe('calendar', () => {
     assert.equal(p27.running, true);
     assert.equal(p27.key, '/work/app');
     assert.deepEqual(by.get(at(25, 0)), []);
+    // 稼働中でも、返事を待っている（作業していない）なら続いている扱いにしない
+    assert.equal(piecesByDay([sess('a', blocks, { live: true, working: false })], days, at(27, 2)).get(at(27, 0))[0].running, false);
   });
 
   test('layout は重なるものを横に並べ、空いた列は使い回す', () => {

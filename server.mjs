@@ -193,12 +193,13 @@ function apiCalendar(url) {
   const sessions = [];
   for (const a of index.all()) {
     if (isNoise(a) || !a.promptCount || a.lastActivityAt < from || a.firstPromptAt > to) continue;
-    const l = live.get(a.sessionId);
-    const segs = segmentsOf(a.timeline, { from, to, live: l?.state?.key || null });
+    const l = live.get(a.sessionId), key = l?.state?.key || null;
+    const segs = segmentsOf(a.timeline, { from, to, live: key });
     const blocks = blocksOf(segs);
     if (!blocks.length) continue;
     const h = historyItem(a, l);
-    sessions.push({ sessionId: a.sessionId, name: h.name, project: h.project, cwd: h.cwd, live: !!l, segs, blocks });
+    // working: 今も Claude の作業が続いている（最後のまとまりを今まで伸ばしている）
+    sessions.push({ sessionId: a.sessionId, name: h.name, project: h.project, cwd: h.cwd, live: !!l, working: key === 'working' || key === 'stalled' || key === 'waiting', segs, blocks });
   }
   sessions.sort((x, y) => x.blocks[0].start - y.blocks[0].start);
   const work = sessions.reduce((n, s) => n + s.blocks.reduce((m, b) => m + b.work.reduce((k, [ws, we]) => k + we - ws, 0), 0), 0);

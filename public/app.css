@@ -603,7 +603,8 @@ dialog.detail::backdrop { background: rgb(20 28 30 / .35); }
 .cal-head { display: grid; grid-template-columns: var(--axis) repeat(var(--cols), minmax(0, 1fr)); border-bottom: 1px solid var(--rule); }
 .cal-dh { all: unset; cursor: pointer; display: flex; align-items: baseline; justify-content: center; gap: 4px; padding: 8px 0 6px; font-size: 12px; color: var(--ink-2); }
 .cal-dh b { font-size: 16px; font-weight: 600; color: var(--ink); }
-.cal-dh:hover b { text-decoration: underline; }
+.cal-dh:hover:not(:disabled) b { text-decoration: underline; }
+.cal-dh:disabled { cursor: default; }
 .cal-dh.today b { color: var(--bg); background: var(--ink); border-radius: 999px; padding: 0 7px; }
 .cal-dh.sun, .cell-day.sun, .cal-dow .sun { color: var(--call); }
 .cal-dh.sat, .cell-day.sat, .cal-dow .sat { color: var(--work); }

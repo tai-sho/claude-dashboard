@@ -155,6 +155,7 @@ describe('API', () => {
     assert.equal(old.blocks[0].end - old.blocks[0].start, 100000);
     assert.deepEqual(old.blocks[0].work, [[old.blocks[0].start, old.blocks[0].end]]);
     assert.equal(json.sessions[1].live, true);
+    assert.equal(json.sessions[1].working, false); // 返答のあとはあなたの番
     assert.ok(json.sessions[1].cwd, 'プロジェクトの色を決めるため作業フォルダを返す');
     assert.equal(json.work, 100000 + 30000);
     assert.equal(json.peak.peak, 1);
