@@ -17,7 +17,9 @@ export function elapsed(ms) {
   if (h < 48) return { n: h, u: '時間' };
   return { n: Math.floor(h / 24), u: '日' };
 }
-export const ago = t => { const e = elapsed(Date.now() - t); return `${e.n}${e.u}前`; };
+// 盤面の空の色を決める時間帯（朝 5〜9時、昼 10〜15時、夕 16〜18時、夜 それ以外）
+export const daypart = hour => (hour >= 5 && hour < 10 ? 'morning' : hour >= 10 && hour < 16 ? 'day' : hour >= 16 && hour < 19 ? 'evening' : 'night');
+export const ago = t =>{ const e = elapsed(Date.now() - t); return `${e.n}${e.u}前`; };
 export const hhmm = t => new Date(t).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 export const dayKey = t => new Date(t).toLocaleDateString('sv-SE');
 export function dayLabel(key) {

@@ -19,6 +19,10 @@
   --flap: #e2e6df;       /* 発車標の文字板 */
   --aged: #ecd6a4;       /* 待たせて焼けた紙 */
   --scorch: #9a5b16;     /* 焼けた縁 */
+  --led-bg: #222a2c;     /* 電光掲示の板（ライトでもダークでも暗い） */
+  --led: #ffb547;        /* 電光掲示の文字 */
+  --sky-morning: #f4cf96; --sky-day: #c6dbe4; --sky-evening: #f0a982; --sky-night: #8f9bd0; /* 時間帯の空 */
+  --star: rgb(255 255 255 / .95);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -28,6 +32,8 @@
     --call: #ef6a55; --call-soft: #4a2723; --turn: #f0b23c; --turn-soft: #45391f;
     --work: #8ea4ec; --work-soft: #28324d; --rest: #6e7a76; --ok: #6fbf92; --focus: #8ea4ec; --mark: #5e4f1c;
     --flap: #1a2225; --aged: #4a3b1d; --scorch: #e08a2e;
+    --led-bg: #0d1214; --led: #ffb547;
+    --sky-morning: #4b3a22; --sky-day: #1f3640; --sky-evening: #4d2a24; --sky-night: #1d2552; --star: rgb(255 255 255 / .8);
     color-scheme: dark;
   }
 }
@@ -36,7 +42,9 @@
   --ink: #e3e8e2; --ink-2: #aeb8b4; --ink-3: #7f8a87; --rule: #34403f;
   --call: #ef6a55; --call-soft: #4a2723; --turn: #f0b23c; --turn-soft: #45391f;
   --work: #8ea4ec; --work-soft: #28324d; --rest: #6e7a76; --ok: #6fbf92; --focus: #8ea4ec; --mark: #5e4f1c;
-    --flap: #1a2225; --aged: #4a3b1d; --scorch: #e08a2e;
+  --flap: #1a2225; --aged: #4a3b1d; --scorch: #e08a2e;
+  --led-bg: #0d1214; --led: #ffb547;
+  --sky-morning: #4b3a22; --sky-day: #1f3640; --sky-evening: #4d2a24; --sky-night: #1d2552; --star: rgb(255 255 255 / .8);
   color-scheme: dark;
 }
 
@@ -51,6 +59,26 @@ body {
   font-feature-settings: "palt" 1;
   -webkit-font-smoothing: antialiased;
 }
+/* 時間帯の空: 見出しの後ろに薄く色を差す。夜は星がまたたく */
+:root[data-daypart="morning"] { --sky: var(--sky-morning); }
+:root[data-daypart="day"] { --sky: var(--sky-day); }
+:root[data-daypart="evening"] { --sky: var(--sky-evening); }
+:root[data-daypart="night"] { --sky: var(--sky-night); }
+body::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 300px; z-index: -1; pointer-events: none;
+  background: linear-gradient(color-mix(in oklab, var(--sky, var(--bg)) 70%, transparent), transparent);
+}
+:root[data-daypart="night"] body::after {
+  content: ""; position: absolute; inset: 0 0 auto; height: 200px; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(1.2px 1.2px at 12% 22%, var(--star), transparent), radial-gradient(1px 1px at 27% 58%, var(--star), transparent),
+    radial-gradient(1.4px 1.4px at 41% 14%, var(--star), transparent), radial-gradient(1px 1px at 56% 40%, var(--star), transparent),
+    radial-gradient(1.2px 1.2px at 68% 18%, var(--star), transparent), radial-gradient(1px 1px at 79% 52%, var(--star), transparent),
+    radial-gradient(1.4px 1.4px at 90% 26%, var(--star), transparent), radial-gradient(1px 1px at 6% 66%, var(--star), transparent);
+  -webkit-mask: linear-gradient(#000, transparent); mask: linear-gradient(#000, transparent);
+  animation: twinkle 5s ease-in-out infinite alternate;
+}
+@keyframes twinkle { from { opacity: .35; } to { opacity: 1; } }
 button, a, input { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
 .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
@@ -73,6 +101,13 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1
   letter-spacing: -0.01em;
 }
 .verdict[data-tone="call"] { color: var(--call); }
+.verdict .v-num { margin-right: .08em; }
+.verdict .v-num .flap { margin-left: 0; margin-right: .04em; }
+.verdict .vch { display: inline-block; white-space: pre; animation: vflip .55s cubic-bezier(.25, 1.4, .5, 1) both; animation-delay: calc(var(--i) * 26ms + var(--vd, 0ms)); }
+@keyframes vflip {
+  0% { transform: perspective(300px) rotateX(-90deg); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
 .tally { margin: 6px 0 0; color: var(--ink-2); font-size: 15px; }
 .tally b { font-weight: 600; color: var(--ink); }
 .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
@@ -89,6 +124,25 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1
 .live { font-size: 13px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 6px; }
 .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
 .live[data-off]::before { background: var(--call); }
+
+/* 伝票刺し: 今日「確認した」を押した伝票が丸めて刺さっていく */
+.spike { position: relative; display: inline-flex; align-items: flex-end; gap: 4px; height: 40px; padding: 0 4px 0 10px; transform-origin: 50% 100%; }
+.spike-stack { position: relative; width: 22px; height: 40px; }
+.spike-stack::before { /* 針 */
+  content: ""; position: absolute; left: 50%; bottom: 3px; width: 2px; height: 34px; margin-left: -1px; z-index: 2;
+  background: linear-gradient(var(--ink-3), var(--ink-2)); border-radius: 2px 2px 0 0;
+  clip-path: polygon(50% 0, 100% 10%, 100% 100%, 0 100%, 0 10%);
+}
+.spike-stack::after { /* 台 */
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; border-radius: 50%; z-index: 1;
+  background: var(--ink-2); box-shadow: 0 1px 0 var(--rule);
+}
+.spike-stack i {
+  position: absolute; left: 50%; bottom: calc(5px + var(--k) * 3.4px); width: var(--w, 15px); height: 9px; margin-left: calc(var(--w, 15px) / -2); z-index: 1;
+  background: var(--surface); border: 1px solid var(--ink-3); border-radius: 45% 30% 52% 36%; rotate: var(--r); translate: var(--x, 0) 0;
+  box-shadow: inset -2px -1px 0 color-mix(in oklab, var(--ink-3) 30%, transparent);
+}
+.spike-n { font-size: 13px; color: var(--ink-2); font-weight: 600; min-width: 1ch; }
 
 /* 使用枠メーター（見出しの下に常時表示） */
 .meters { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 12px; }
@@ -148,7 +202,7 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1
 }
 .hint code { font-size: 12.5px; background: var(--surface-2); padding: 1px 5px; border-radius: 3px; }
 
-main { padding: 8px 32px 48px; }
+main { padding: 8px 32px 48px; overflow-x: clip; }
 .lane { margin-top: 28px; }
 .lane > h2 {
   display: flex; align-items: baseline; gap: 10px;
@@ -181,6 +235,23 @@ main { padding: 8px 32px 48px; }
   margin: 0 0 12px; font-size: 18px; font-weight: 600; line-height: 1.35;
 }
 .proj .p-name { overflow-wrap: anywhere; min-width: 0; }
+.proj > h2 .planet { align-self: center; margin-right: 4px; }
+
+/* プロジェクトの印: 眺めるモードの惑星と同じ種類と色 */
+.planet {
+  position: relative; display: inline-block; flex: none; width: 14px; height: 14px; border-radius: 50%; vertical-align: -2px; margin-right: 6px;
+  --shade: color-mix(in oklab, var(--pl-b), var(--pl-c) 45%);
+  background: radial-gradient(circle at 35% 30%, var(--pl-a), var(--pl-b) 58%, var(--shade));
+  box-shadow: inset -1.5px -1.5px 2px rgb(0 0 0 / .22), 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent);
+}
+.planet[data-type="gas"] { background: linear-gradient(172deg, var(--pl-b) 0 20%, var(--pl-a) 20% 36%, var(--pl-b) 36% 50%, var(--pl-c) 50% 58%, var(--pl-a) 58% 76%, var(--pl-b) 76%); }
+.planet[data-type="terran"] { background: radial-gradient(circle at 64% 36%, var(--pl-d) 0 17%, transparent 18%), radial-gradient(circle at 30% 68%, var(--pl-e) 0 13%, transparent 14%), radial-gradient(circle at 35% 30%, var(--pl-a), var(--pl-b) 55%, var(--shade)); }
+.planet[data-type="rock"] { background: radial-gradient(circle at 64% 60%, var(--shade) 0 13%, transparent 15%), radial-gradient(circle at 34% 44%, var(--shade) 0 8%, transparent 10%), radial-gradient(circle at 35% 30%, var(--pl-a), var(--pl-b) 62%, var(--shade)); }
+.planet.ringed { margin: 0 10px 0 4px; }
+.planet.ringed::after {
+  content: ""; position: absolute; left: -5px; right: -5px; top: 50%; height: 5px; margin-top: -2.5px; border-radius: 50%;
+  border: 1.5px solid color-mix(in oklab, var(--pl-a) 85%, transparent); border-top-color: transparent; rotate: -16deg;
+}
 .proj > h2::after { content: ""; order: 1; flex: 1 1 40px; align-self: center; border-top: 1px solid var(--rule); }
 .proj .p-tally { order: 2; display: flex; gap: 14px; font-size: 13px; font-weight: 500; color: var(--ink-3); }
 .proj .pc b { font-size: 15px; font-weight: 600; color: var(--ink-2); margin-left: 2px; }
@@ -202,12 +273,31 @@ main { padding: 8px 32px 48px; }
   background: var(--paper, var(--surface));
   border-radius: 4px;
   border: 1px solid var(--rule);
+  transform-origin: 50% 0;
 }
-/* 待たせている伝票は紙が焼けていく（--age: 0〜1） */
+/* 待たせている伝票は紙が焼けていく（--age: 0〜1）。ピンで吊られ、だんだん傾き、角が反り、ピンが抜けかける */
 .ticket.aged {
   --paper: color-mix(in oklab, var(--surface), var(--aged) calc(var(--age) * 100%));
   box-shadow: inset 0 0 calc(4px + var(--age) * 26px) color-mix(in oklab, var(--scorch) calc(var(--age) * 42%), transparent);
+  rotate: calc(var(--age) * var(--tilt) * 1.6deg);
+  transition: rotate .45s cubic-bezier(.3, 1.4, .5, 1);
 }
+.ticket.aged:hover, .ticket.aged:focus-within { rotate: 0deg; }
+.ticket .pin {
+  position: absolute; left: 50%; top: -6px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; z-index: 2;
+  background: radial-gradient(circle at 35% 30%, var(--surface) 0 16%, var(--ink-2) 48%, var(--ink) 100%);
+  box-shadow: 1px 2px 2px rgb(0 0 0 / .28);
+  translate: calc(max(0, var(--age) - .55) * var(--tilt) * 14px) calc(max(0, var(--age) - .55) * -10px);
+  rotate: calc(max(0, var(--age) - .55) * var(--tilt) * 70deg);
+}
+.ticket .curl {
+  position: absolute; right: -1px; bottom: -1px; width: calc(2px + var(--age) * 24px); height: calc(2px + var(--age) * 24px);
+  border-radius: 6px 0 4px 0; pointer-events: none;
+  background: linear-gradient(315deg, var(--bg) 0 50%, color-mix(in oklab, var(--paper, var(--surface)) 72%, var(--scorch)) 50% 100%);
+  box-shadow: -2px -2px 4px rgb(0 0 0 / .12);
+}
+/* プロジェクトの色の札（右上） */
+.ticket .ptab { position: absolute; right: 16px; top: -1px; width: 30px; height: 4px; border-radius: 0 0 3px 3px; background: var(--proj, var(--rest)); }
 .ticket::before {
   content: ""; position: absolute; left: -1px; top: -1px; bottom: -1px; width: 6px;
   border-radius: 4px 0 0 4px; background: var(--bar, var(--rest));
@@ -253,12 +343,45 @@ main { padding: 8px 32px 48px; }
 .ticket[data-state="stalled"] .ecg path { stroke: var(--call); }
 .ticket[data-state="stalled"] .ecg-head { background: var(--call); animation: none; }
 
+/* 電光掲示: 最近のツールが右から左へ流れる。新しいツールが来ると一度明るくなる */
+.ticker {
+  grid-column: 1 / -1; position: relative; margin-top: 10px; overflow: hidden; container-type: inline-size;
+  background: var(--led-bg); border-radius: 3px; padding: 5px 0; font-size: 12.5px; line-height: 1.4;
+  color: var(--led); text-shadow: 0 0 6px color-mix(in oklab, var(--led) 60%, transparent);
+}
+.ticker::after { /* 点の粒 */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle, transparent 0 .9px, color-mix(in oklab, var(--led-bg) 55%, transparent) 1.2px) 0 0 / 3px 3px;
+}
+.tk-track { display: flex; width: max-content; animation: ticker var(--dur) linear infinite; animation-delay: var(--off); }
+.tk-run { display: inline-flex; align-items: baseline; gap: 10px; min-width: 100cqw; padding: 0 28px 0 12px; white-space: nowrap; }
+.tk-item b { font-weight: 600; margin-right: 6px; }
+.tk-sep { font-style: normal; opacity: .5; }
+@keyframes ticker { to { transform: translateX(-50%); } }
+.ticker.new { animation: led-flash 1.4s ease-out both; animation-delay: var(--kd, 0ms); }
+@keyframes led-flash { 0%, 18% { filter: brightness(1.7) saturate(1.2); } 100% { filter: none; } }
+
+/* 縁を走る光: ツールを呼ぶたびに枠を一周する */
+@property --zap { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.ticket.zap::after {
+  content: ""; position: absolute; inset: -1px; border-radius: 4px; padding: 2px; pointer-events: none;
+  background: conic-gradient(from var(--zap), transparent 0 72%, color-mix(in oklab, var(--work) 35%, transparent) 86%, var(--work) 97%, transparent);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: zap 1.1s cubic-bezier(.45, .1, .55, .9) both; animation-delay: var(--zd, 0ms);
+}
+@keyframes zap { 0% { --zap: 0deg; opacity: 1; } 80% { opacity: 1; } 100% { --zap: 360deg; opacity: 0; } }
+
+/* 新しく届いた返答をタイプライターで打ち出す */
+[data-typing]::after { content: "▍"; margin-left: 1px; color: var(--ink-3); animation: caret .5s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+
 /* 閉じてよい: 判子 */
 .flag.stamp {
   display: inline-block; padding: 0 7px; border: 2px solid currentColor; outline: 1px solid currentColor; outline-offset: 1px;
   border-radius: 3px; transform: rotate(-4deg); letter-spacing: .04em; line-height: 1.5;
 }
-.flag.stamp.pressed { animation: stamp .55s cubic-bezier(.2, .9, .3, 1.2) both; }
+.flag.stamp.pressed { animation: stamp .55s cubic-bezier(.2, .9, .3, 1.2) both; animation-delay: var(--sd, 0ms); }
 @keyframes stamp {
   0% { transform: scale(2.4) rotate(-16deg); opacity: 0; }
   55% { transform: scale(.92) rotate(-3deg); opacity: 1; box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 45%, transparent); }
@@ -299,9 +422,42 @@ main { padding: 8px 32px 48px; }
 
 .pulse { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--work); margin-right: 6px; vertical-align: 1px; animation: breathe 2.4s ease-in-out infinite; }
 @keyframes breathe { 50% { opacity: .25; } }
-.ticket.fresh { animation: ring 1.6s ease-out 1; }
-@keyframes ring { 0% { box-shadow: 0 0 0 0 var(--bar); } 100% { box-shadow: 0 0 0 14px transparent; } }
-@media (prefers-reduced-motion: reduce) { .pulse, .ticket.fresh, .flap.flip, .flag.stamp.pressed, .ecg-head { animation: none; } }
+.ticket.fresh { animation: ring 1.2s ease-out 2; animation-delay: var(--fd, 0ms); }
+@keyframes ring { 0% { box-shadow: 0 0 0 0 var(--bar); } 100% { box-shadow: 0 0 0 18px transparent; } }
+
+/* 凪: あなたを待っているものがないとき */
+.calm {
+  grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px 20px;
+  margin-top: 12px; padding: 14px 18px; border: 1px dashed var(--rule); border-radius: 4px; color: var(--ink-2); font-size: 14px;
+}
+.calm p { margin: 0; }
+.calm p b { color: var(--work); font-weight: 600; }
+.calm-rail { position: relative; display: flex; gap: 16px; padding: 0 6px; height: 22px; align-items: flex-start; }
+.calm-rail::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px; background: var(--rule); border-radius: 1px; }
+.calm-rail i { position: relative; width: 7px; height: 12px; border: 2px solid var(--ink-3); border-top: 0; border-radius: 0 0 6px 6px; margin-top: 4px; opacity: .7; }
+.calm-lights { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.calm-light {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--work);
+  box-shadow: 0 0 6px color-mix(in oklab, var(--work) 70%, transparent);
+  animation: breathe 2.4s ease-in-out infinite; animation-delay: var(--ph);
+}
+.calm-light.beat { animation: beat .9s ease-out both; animation-delay: var(--bd, 0ms); }
+@keyframes beat { 0% { transform: scale(1.9); box-shadow: 0 0 16px var(--work); } 100% { transform: none; } }
+
+/* 盤面の上に重ねる演出（ちぎれて落ちる伝票、伝票刺しへ飛ぶ伝票、紙吹雪） */
+.fx-layer { position: fixed; inset: 0; z-index: 8; pointer-events: none; overflow: hidden; }
+.fx-layer .ghost { position: fixed; margin: 0; list-style: none; box-sizing: border-box; animation: none; transition: none; }
+.fx-layer li.ghost { background: var(--bg); }
+.fx-layer .ghost.crumple { overflow: hidden; box-shadow: 0 6px 18px rgb(0 0 0 / .18); }
+.fx-layer .confetti { position: fixed; inset: 0; width: 100%; height: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse, .ticket.fresh, .flap.flip, .flag.stamp.pressed, .ecg-head, .ticket.zap::after, .ticker.new, .tk-track,
+  .verdict .vch, .calm-light, [data-typing]::after, :root[data-daypart="night"] body::after { animation: none; }
+  .ticket.aged { transition: none; }
+  .tk-run + .tk-run { display: none; }
+  .tk-run { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+}
 
 /* ---------- 行の一覧（寝かせ・台帳・履歴） ---------- */
 .rows { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
@@ -561,6 +717,9 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
   .arrange { justify-content: flex-start; }
   .proj > h2::after { display: none; }
   .proj .p-tally { flex-basis: 100%; }
+  .calm { grid-template-columns: 1fr; }
+  .calm-lights { justify-content: flex-start; }
+  .spike { padding-left: 0; }
   .row-btn, .hist .row-btn, .hits .row-btn { grid-template-columns: 1fr auto; }
   .r-where, .r-flag, .hist .r-time { display: none; }
   .ledger > li { grid-template-columns: 1fr; }

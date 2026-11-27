@@ -28,13 +28,16 @@ export function sortLanes(sessions, laneOf) {
   return lanes;
 }
 
+// プロジェクトを見分ける鍵。worktree は元のリポジトリにまとめる。盤面のプロジェクト別と眺めるモードの惑星で同じものを使う
+export const projectKey = s => (s.cwd && s.project !== 'No folder' ? rootOf(s.cwd) : '') || s.project || '不明';
+
 // プロジェクト別: 呼ばれている度合いの高いプロジェクトを上に。
 // 表示名（フォルダ名）が同じでも別のリポジトリは分け、見出しに親フォルダ名を添える。worktree は元のリポジトリにまとめる
 export function groupByProject(lanes) {
   const groups = new Map();
   const at = s => {
-    const root = s.cwd && s.project !== 'No folder' ? rootOf(s.cwd) : '', key = root || s.project || '不明';
-    if (!groups.has(key)) groups.set(key, { name: s.project || '不明', root, you: [], work: [], rest: [], calls: 0, last: 0 });
+    const root = s.cwd && s.project !== 'No folder' ? rootOf(s.cwd) : '', key = projectKey(s);
+    if (!groups.has(key)) groups.set(key, { key, name: s.project || '不明', root, you: [], work: [], rest: [], calls: 0, last: 0 });
     return groups.get(key);
   };
   for (const lane of ['you', 'work', 'rest']) {

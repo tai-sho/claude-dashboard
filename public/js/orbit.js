@@ -7,8 +7,9 @@
 // - 観測している天体にピントを合わせ、前後をぼかす
 // ドラッグで回し、ホイールで寄る。天体を押すとカメラが寄り、右に観測カードを出す。呼ばれても閉じず、画面の中で知らせる。
 import { $, reduceMotion } from './dom.js';
-import { esc, plain, elapsed, where, openActions, short, rootOf } from './format.js';
-import { since } from './lanes.js';
+import { esc, plain, elapsed, where, openActions, short } from './format.js';
+import { since, projectKey } from './lanes.js';
+import { hash, TYPES, planetOf } from './planet.js';
 import { getData, laneOf } from './live.js';
 
 const TAU = Math.PI * 2;
@@ -23,7 +24,6 @@ const ZOOM_MIN = .25, ZOOM_MAX = 3, PITCH_MIN = -.6, PITCH_MAX = 1.2;
 const SAT_BODY = 2.6; // 衛星の影の大きさ（世界の長さ）
 let nebula = null;
 
-const hash = (s, k = 0) => { let h = 2166136261 ^ k; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
 const clamp = (v, a = 0, b = 1) => (v < a ? a : v > b ? b : v);
 const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a)); return t * t * (3 - 2 * t); };
 const rgb = hex => { const n = parseInt(hex.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
@@ -95,19 +95,13 @@ function makeStars() {
 }
 
 // ---------- 世界の組み立て ----------
-const TYPES = ['gas', 'terran', 'ice', 'rock'];
-const GAS_PALETTES = [
-  [[0, '#7a4a2e'], [.25, '#c9935e'], [.45, '#ead3ae'], [.6, '#b37a4b'], [.8, '#e3c9a0'], [1, '#8a5634']],
-  [[0, '#2f4a73'], [.3, '#7f9fc4'], [.5, '#d5e2ee'], [.7, '#5b7ba3'], [1, '#a9bfd8'], [1, '#a9bfd8']],
-  [[0, '#4d5a3b'], [.3, '#a9a46a'], [.55, '#e2dcb4'], [.75, '#8c8550'], [1, '#c8c08a'], [1, '#c8c08a']],
-];
 const ATM = { gas: rgbf('#e8c79a'), terran: rgbf('#6fa8ff'), ice: rgbf('#bfe8ff'), rock: rgbf('#d9a77a') };
 const ATM_STRENGTH = { gas: .45, terran: .9, ice: .55, rock: .18 };
 
 function build(data) {
   const groups = new Map();
   for (const s of data.sessions) {
-    const key = rootOf(s.cwd) || s.project || '不明';
+    const key = projectKey(s);
     if (!groups.has(key)) groups.set(key, { key, name: s.project || '不明', sessions: [] });
     groups.get(key).sessions.push(s);
   }
@@ -116,10 +110,8 @@ function build(data) {
   const old = new Map(planets.map(p => [p.key, p]));
   planets = list.map((g, i) => {
     const a = i / list.length * TAU, prev = old.get(g.key);
-    const type = TYPES[Math.floor(hash(g.key, 7) * TYPES.length)];
+    const { type, ring, pal } = planetOf(g.key);
     const r = 22 + Math.min(18, g.sessions.length * 3.5);
-    const ring = type === 'gas' && hash(g.key, 8) > .35;
-    const pal = GAS_PALETTES[Math.floor(hash(g.key, 13) * GAS_PALETTES.length)];
     return {
       ...g, type, r, ring,
       x: Math.cos(a) * ringR, y: (hash(g.key) - .5) * 70, z: Math.sin(a) * ringR,

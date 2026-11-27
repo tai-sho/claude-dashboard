@@ -1,8 +1,9 @@
 // 画面のモジュールのうち DOM に触らないもの（文字の整形、盤面の並べ方、使用枠の計算）
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { esc, highlight, where, openActions, shQuote, elapsed, rootOf, plain } from '../public/js/format.js';
-import { laneFor, sortLanes, groupByProject, REST_AFTER_MS } from '../public/js/lanes.js';
+import { esc, highlight, where, openActions, shQuote, elapsed, rootOf, plain, daypart } from '../public/js/format.js';
+import { laneFor, sortLanes, groupByProject, projectKey, REST_AFTER_MS } from '../public/js/lanes.js';
+import { planetOf, TYPES } from '../public/js/planet.js';
 import { parseReset, untilText, projection, WINDOWS } from '../public/js/quota.js';
 
 const M = 60000;
@@ -100,6 +101,38 @@ describe('lanes', () => {
       ['app（solo）', 3, 1],
       ['tool', 3, 1],
     ]);
+  });
+
+  test('projectKey は worktree を元のリポジトリにまとめ、フォルダのないセッションはプロジェクト名でまとめる', () => {
+    assert.equal(projectKey({ project: 'app', cwd: '/work/app/.claude/worktrees/x/src' }), '/work/app');
+    assert.equal(projectKey({ project: 'No folder', cwd: '/tmp/scratch-workspaces/a' }), 'No folder');
+    assert.equal(projectKey({}), '不明');
+    // groupByProject の鍵と同じ
+    const g = groupByProject({ you: [session('a', 'waiting', { cwd: '/work/app/.claude/worktrees/x' })], work: [], rest: [] });
+    assert.equal(g[0].key, '/work/app');
+  });
+});
+
+describe('planet', () => {
+  test('同じプロジェクトにはいつも同じ惑星を返し、環はガス惑星だけに付く', () => {
+    const seen = new Set();
+    for (let i = 0; i < 60; i++) {
+      const p = planetOf(`/work/project-${i}`);
+      assert.deepEqual(planetOf(`/work/project-${i}`), p);
+      assert.ok(TYPES.includes(p.type));
+      if (p.ring) assert.equal(p.type, 'gas');
+      assert.equal(p.glyph.length, 3);
+      for (const c of p.glyph) assert.match(c, /^#[0-9a-f]{6}$/);
+      seen.add(p.type);
+    }
+    assert.equal(seen.size, TYPES.length); // どの種類も出る
+  });
+});
+
+describe('daypart', () => {
+  test('時刻から空の色の時間帯を決める', () => {
+    assert.deepEqual([0, 4, 5, 9, 10, 15, 16, 18, 19, 23].map(daypart),
+      ['night', 'night', 'morning', 'morning', 'day', 'day', 'evening', 'evening', 'night', 'night']);
   });
 });
 
