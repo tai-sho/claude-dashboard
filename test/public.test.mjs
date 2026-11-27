@@ -1,9 +1,10 @@
-// 画面のモジュールのうち DOM に触らないもの（文字の整形、盤面の並べ方、使用枠の計算）
+// 画面のモジュールのうち DOM に触らないもの（文字の整形、盤面の並べ方、使用枠の計算、カレンダーの計算）
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { esc, highlight, where, openActions, shQuote, elapsed, rootOf, plain, daypart } from '../public/js/format.js';
 import { laneFor, sortLanes, groupByProject, projectKey, REST_AFTER_MS } from '../public/js/lanes.js';
 import { planetOf, TYPES } from '../public/js/planet.js';
+import { rangeOf, shift, piecesByDay, layout, hourRange, daySummary, colorSlots, PALETTE_SIZE, durText } from '../public/js/calendar.js';
 import { parseReset, untilText, projection, WINDOWS } from '../public/js/quota.js';
 
 const M = 60000;
@@ -163,5 +164,82 @@ describe('quota', () => {
     // 1時間で50%増えている → リセット前に上限に届く
     const fast = projection(w, { used_percentage: 60, resets_at: reset }, [rec(NOW - 60 * M, 10), rec(NOW, 60)], NOW);
     assert.equal(fast.over, true);
+  });
+});
+
+describe('calendar', () => {
+  // 画面側の時刻で組み立てる（テストを動かす場所のタイムゾーンに左右されないように）
+  const at = (d, h, m = 0) => new Date(2026, 10, d, h, m).getTime(); // 2026年11月
+  const sess = (id, blocks, extra = {}) => ({ sessionId: id, name: id, project: 'app', cwd: '/work/app', live: false, blocks, ...extra });
+
+  test('rangeOf は日・日曜始まりの週・月を含む週をすべて返す', () => {
+    const fri = at(27, 15);
+    assert.deepEqual(rangeOf('day', fri), { days: [at(27, 0)], from: at(27, 0), to: at(28, 0) });
+    const w = rangeOf('week', fri);
+    assert.equal(w.days.length, 7);
+    assert.equal(w.from, at(22, 0)); // 日曜
+    assert.equal(w.to, at(29, 0));
+    const m = rangeOf('month', fri);
+    assert.equal(m.from, at(1, 0)); // 2026年11月1日は日曜
+    assert.equal(m.days.length, 35); // 30日（月）を含む週の土曜 12月5日まで
+    assert.equal(m.to, new Date(2026, 11, 6).getTime());
+  });
+
+  test('shift は前後の期間へ移り、月は1日に揃える', () => {
+    assert.equal(shift('day', at(27, 15), -1), at(26, 0));
+    assert.equal(shift('week', at(27, 15), 1), new Date(2026, 11, 4).getTime());
+    assert.equal(shift('month', new Date(2026, 0, 31).getTime(), 1), new Date(2026, 1, 1).getTime()); // 2月31日にならない
+  });
+
+  test('piecesByDay は日をまたぐまとまりを日ごとに切り、作業中の区間も切る', () => {
+    const days = rangeOf('week', at(27, 0)).days;
+    const by = piecesByDay([sess('a', [{ start: at(26, 22), end: at(27, 2), work: [[at(26, 23), at(27, 1)]] }], { live: true })], days, at(27, 2));
+    const [p26] = by.get(at(26, 0)), [p27] = by.get(at(27, 0));
+    assert.deepEqual([p26.start, p26.end, p26.work], [at(26, 22), at(27, 0), [[at(26, 23), at(27, 0)]]]);
+    assert.deepEqual([p27.start, p27.end, p27.work], [at(27, 0), at(27, 2), [[at(27, 0), at(27, 1)]]]);
+    assert.equal(p26.running, false); // 続いているのは最後の切れ端だけ
+    assert.equal(p27.running, true);
+    assert.equal(p27.key, '/work/app');
+    assert.deepEqual(by.get(at(25, 0)), []);
+  });
+
+  test('layout は重なるものを横に並べ、空いた列は使い回す', () => {
+    const p = (id, s, e) => ({ sessionId: id, start: s, end: e });
+    const out = layout([p('a', at(1, 9), at(1, 11)), p('b', at(1, 10), at(1, 12)), p('c', at(1, 11, 30), at(1, 12, 30)), p('d', at(1, 14), at(1, 15))]);
+    assert.deepEqual(out.map(x => [x.sessionId, x.col, x.cols]), [['a', 0, 2], ['b', 1, 2], ['c', 0, 2], ['d', 0, 1]]);
+    // 短いまとまりは画面でとる高さで重なりを判断する
+    const short = [p('x', at(1, 9), at(1, 9, 1)), p('y', at(1, 9, 5), at(1, 9, 6))];
+    assert.deepEqual(layout(short).map(x => x.cols), [1, 1]);
+    assert.deepEqual(layout(short, 20 * M).map(x => [x.col, x.cols]), [[0, 2], [1, 2]]);
+  });
+
+  test('hourRange はまとまりと今を含み、少なくとも8時間にする', () => {
+    assert.deepEqual(hourRange([]), [9, 18]);
+    assert.deepEqual(hourRange([{ start: at(1, 10, 30), end: at(1, 13, 10) }]), [10, 18]); // 足りない分は先へ広げる
+    assert.deepEqual(hourRange([{ start: at(1, 1), end: at(2, 0) }]), [1, 24]); // 日の終わりは24時
+    assert.deepEqual(hourRange([{ start: at(1, 20), end: at(1, 23) }], at(1, 23, 30)), [16, 24]);
+  });
+
+  test('daySummary は同じセッションをまとめて作業時間を足す', () => {
+    const w = (s, e) => ({ sessionId: 'a', name: 'a', project: 'app', key: 'k', start: s, end: e, work: [[s, e]], running: false });
+    const sum = daySummary([w(at(1, 9), at(1, 10)), { ...w(at(1, 8), at(1, 8, 30)), sessionId: 'b' }, w(at(1, 13), at(1, 13, 30))]);
+    assert.equal(sum.work, 2 * 3600000);
+    assert.deepEqual(sum.sessions.map(s => [s.sessionId, s.work / M]), [['b', 30], ['a', 90]]);
+  });
+
+  test('durText', () => {
+    assert.equal(durText(20000), '1分未満');
+    assert.equal(durText(45 * M), '45分');
+    assert.equal(durText(120 * M), '2時間');
+    assert.equal(durText(130 * M), '2時間10分');
+  });
+
+  test('colorSlots は同じ画面のプロジェクトに別々の色を割り当て、同じ鍵には同じ色を返す', () => {
+    const keys = Array.from({ length: PALETTE_SIZE }, (_, i) => `/work/project-${i}`);
+    const a = colorSlots(keys);
+    assert.equal(new Set(a.values()).size, PALETTE_SIZE);
+    assert.deepEqual(colorSlots(keys), a);
+    // 1つだけなら、ほかとの兼ね合いに関係なく鍵から決まる色
+    assert.equal(colorSlots(['/work/x']).get('/work/x'), colorSlots(['/work/x', '/work/y']).get('/work/x'));
   });
 });

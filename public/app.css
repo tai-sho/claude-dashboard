@@ -23,6 +23,8 @@
   --led: #ffb547;        /* 電光掲示の文字 */
   --sky-morning: #f4cf96; --sky-day: #c6dbe4; --sky-evening: #f0a982; --sky-night: #8f9bd0; /* 時間帯の空 */
   --star: rgb(255 255 255 / .95);
+  --cal-0: #3d6fd6; --cal-1: #c98410; --cal-2: #2e8c58; --cal-3: #b5428c; --cal-4: #16929e; --cal-5: #7d55c4; --cal-6: #7a8a1e; --cal-7: #a65f36; /* カレンダーのプロジェクトの色 */
+  --cal-tint: 20%;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -34,6 +36,7 @@
     --flap: #1a2225; --aged: #4a3b1d; --scorch: #e08a2e;
     --led-bg: #0d1214; --led: #ffb547;
     --sky-morning: #4b3a22; --sky-day: #1f3640; --sky-evening: #4d2a24; --sky-night: #1d2552; --star: rgb(255 255 255 / .8);
+    --cal-0: #7ea2ff; --cal-1: #f0b450; --cal-2: #6cc795; --cal-3: #e584c4; --cal-4: #5ccbd5; --cal-5: #b497f2; --cal-6: #bdc95c; --cal-7: #dc9e74; --cal-tint: 30%;
     color-scheme: dark;
   }
 }
@@ -45,6 +48,7 @@
   --flap: #1a2225; --aged: #4a3b1d; --scorch: #e08a2e;
   --led-bg: #0d1214; --led: #ffb547;
   --sky-morning: #4b3a22; --sky-day: #1f3640; --sky-evening: #4d2a24; --sky-night: #1d2552; --star: rgb(255 255 255 / .8);
+  --cal-0: #7ea2ff; --cal-1: #f0b450; --cal-2: #6cc795; --cal-3: #e584c4; --cal-4: #5ccbd5; --cal-5: #b497f2; --cal-6: #bdc95c; --cal-7: #dc9e74; --cal-tint: 30%;
   color-scheme: dark;
 }
 
@@ -453,7 +457,7 @@ main { padding: 8px 32px 48px; overflow-x: clip; }
 
 @media (prefers-reduced-motion: reduce) {
   .pulse, .ticket.fresh, .flap.flip, .flag.stamp.pressed, .ecg-head, .ticket.zap::after, .ticker.new, .tk-track,
-  .verdict .vch, .calm-light, [data-typing]::after, :root[data-daypart="night"] body::after { animation: none; }
+  .verdict .vch, .calm-light, .cal-ev.running .rail::after, .cell-ev.running i, [data-typing]::after, :root[data-daypart="night"] body::after { animation: none; }
   .ticket.aged { transition: none; }
   .tk-run + .tk-run { display: none; }
   .tk-run { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -579,16 +583,89 @@ dialog.detail::backdrop { background: rgb(20 28 30 / .35); }
 .rv-sec { margin-top: 28px; }
 .rv-sec > h2 { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 0 0 12px; font-size: 17px; font-weight: 600; }
 .rv-sec > h2 span { color: var(--ink-3); font-size: 13px; font-weight: 500; }
-.gantt { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 14px 6px; }
-.gantt svg { display: block; width: 100%; height: auto; }
-.gantt svg text { fill: var(--ink-3); font-size: 11px; font-family: inherit; }
-.gantt svg .g-name { fill: var(--ink-2); font-size: 12px; cursor: pointer; }
-.gantt svg .g-name:hover { fill: var(--ink); text-decoration: underline; }
-.gantt svg .grid { stroke: var(--rule); stroke-width: 1; }
-.gantt svg .now { stroke: var(--call); stroke-width: 1.5; }
-.gantt svg .w { fill: var(--work); }
-.gantt svg .t { fill: var(--turn); opacity: .55; }
-.gantt svg .conc { fill: var(--work); opacity: .3; }
+/* カレンダー: セッションが動いていたまとまりを、プロジェクトの色（--cal-0〜7）で塗る。
+   左の帯（rail）の濃いところが Claude の作業中 */
+.cal-bar { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; }
+.cal-title { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; min-width: 9em; }
+.cal-nav { display: flex; gap: 6px; }
+.cal-nav .ctl:disabled { opacity: .45; cursor: default; }
+.cal-modes { margin: 0 0 0 auto; }
+.cal-tally { margin: 8px 0 0; font-size: 13.5px; color: var(--ink-2); }
+.cal-tally b { font-size: 15px; font-weight: 600; color: var(--ink); margin: 0 1px; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--ink-2); }
+.cal-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.cal-legend i { width: 12px; height: 12px; border-radius: 2px; background: color-mix(in oklab, var(--proj) var(--cal-tint), var(--surface)); border: 1px solid var(--proj); border-left-width: 4px; }
+.cal-help { margin: 10px 0 0; font-size: 12.5px; color: var(--ink-3); }
+
+.cal-scroll { margin-top: 14px; background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; overflow-x: auto; }
+.cal-grid { --axis: 52px; position: relative; padding: 0 10px 10px 0; }
+.cal-grid.week { min-width: 680px; }
+.cal-head { display: grid; grid-template-columns: var(--axis) repeat(var(--cols), minmax(0, 1fr)); border-bottom: 1px solid var(--rule); }
+.cal-dh { all: unset; cursor: pointer; display: flex; align-items: baseline; justify-content: center; gap: 4px; padding: 8px 0 6px; font-size: 12px; color: var(--ink-2); }
+.cal-dh b { font-size: 16px; font-weight: 600; color: var(--ink); }
+.cal-dh:hover b { text-decoration: underline; }
+.cal-dh.today b { color: var(--bg); background: var(--ink); border-radius: 999px; padding: 0 7px; }
+.cal-dh.sun, .cell-day.sun, .cal-dow .sun { color: var(--call); }
+.cal-dh.sat, .cell-day.sat, .cal-dow .sat { color: var(--work); }
+.cal-main { position: relative; display: grid; grid-template-columns: var(--axis) repeat(var(--cols), minmax(0, 1fr)); margin-top: 10px; }
+.cal-axis { position: relative; margin: 0; padding: 0; list-style: none; }
+.cal-axis li { position: absolute; right: 8px; translate: 0 -.6em; font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.cal-col {
+  position: relative; border-left: 1px solid var(--rule);
+  background: repeating-linear-gradient(to bottom, var(--rule) 0 1px, transparent 1px var(--hpx));
+}
+.cal-col:last-child { border-right: 1px solid var(--rule); }
+.cal-grid.week .cal-col.today { background-color: color-mix(in oklab, var(--work) 6%, transparent); }
+.cal-ev {
+  all: unset; box-sizing: border-box; position: absolute; overflow: hidden; cursor: pointer;
+  display: flex; flex-direction: column; gap: 1px; padding: 3px 6px 3px 11px; border-radius: 3px;
+  background: color-mix(in oklab, var(--proj) var(--cal-tint), var(--surface));
+  border: 1px solid color-mix(in oklab, var(--proj) 45%, var(--surface));
+  color: var(--ink); font-size: 12.5px; line-height: 1.35;
+}
+.cal-ev:hover { border-color: var(--proj); z-index: 1; }
+.cal-ev:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; z-index: 1; }
+.cal-ev .rail { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: color-mix(in oklab, var(--proj) 25%, transparent); }
+.cal-ev .rail i { position: absolute; left: 0; right: 0; min-height: 1px; background: var(--proj); }
+.cal-ev .ev-name { font-weight: 600; overflow: hidden; overflow-wrap: anywhere; }
+.cal-ev.tight { justify-content: center; padding-top: 0; padding-bottom: 0; }
+.cal-ev.tight .ev-name { white-space: nowrap; text-overflow: ellipsis; }
+.cal-ev.tight .ev-meta { display: none; }
+.cal-grid.week .cal-ev { font-size: 11.5px; padding-left: 9px; padding-right: 4px; }
+.cal-ev { container-type: inline-size; }
+@container (max-width: 52px) { /* 細いまとまりは名前を縦書きにする */
+  .cal-ev .ev-name { writing-mode: vertical-rl; white-space: nowrap; text-overflow: ellipsis; max-height: 100%; font-size: 11px; letter-spacing: .04em; }
+  .cal-ev .ev-meta { display: none; }
+}
+.cal-ev .ev-meta { font-size: 11.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-ev.running .rail::after { /* 作業が続いている */
+  content: ""; position: absolute; left: -1px; bottom: 2px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--proj); box-shadow: 0 0 6px var(--proj); animation: breathe 2.4s ease-in-out infinite;
+}
+.cal-now { position: absolute; left: -1px; right: 0; z-index: 2; border-top: 2px solid var(--call); pointer-events: none; }
+.cal-now::before { content: ""; position: absolute; left: -5px; top: -6px; width: 10px; height: 10px; border-radius: 50%; background: var(--call); }
+.cal-empty { position: absolute; left: var(--axis); right: 0; top: 40%; margin: 0; text-align: center; font-size: 14px; color: var(--ink-3); pointer-events: none; }
+
+.cal-month { margin-top: 14px; }
+.cal-dow, .cal-cells { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cal-dow span { padding: 0 8px 6px; font-size: 12px; color: var(--ink-2); }
+.cal-cells { gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+.cal-cell { background: var(--surface); min-height: 118px; padding: 6px 6px 8px; min-width: 0; }
+.cal-cell.out { background: var(--surface-2); }
+.cal-cell.out .cell-day, .cal-cell.out .cell-list { opacity: .55; }
+.cell-top { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+.cell-day { all: unset; cursor: pointer; font-size: 14px; font-weight: 600; padding: 0 4px; border-radius: 999px; }
+.cell-day:hover:not(:disabled) { text-decoration: underline; }
+.cell-day:disabled { cursor: default; color: var(--ink-3); }
+.cal-cell.today .cell-day { background: var(--ink); color: var(--bg); padding: 0 7px; }
+.cell-work { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.cell-list { margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 1px; }
+.cell-ev, .cell-more { all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: flex; align-items: center; gap: 5px; padding: 1px 4px; border-radius: 3px; font-size: 12px; line-height: 1.5; }
+.cell-ev:hover, .cell-more:hover { background: var(--surface-2); }
+.cell-ev i { flex: none; width: 4px; height: 12px; border-radius: 1px; background: var(--proj); }
+.cell-ev span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell-ev.running i { box-shadow: 0 0 5px var(--proj); animation: breathe 2.4s ease-in-out infinite; }
+.cell-more { display: block; color: var(--ink-3); font-size: 11.5px; }
 .wrap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
 .wcard { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 14px 16px; min-width: 0; }
 .wcard h3 { margin: 0; font-size: 13.5px; font-weight: 500; color: var(--ink-2); }
@@ -703,6 +780,16 @@ body:has(.ambient:not([hidden])) { overflow: hidden; }
   .views { gap: 18px; overflow-x: auto; overflow-y: hidden; }
   .views a { white-space: nowrap; margin-bottom: 0; }
   .wcard.wide { grid-column: auto; }
+  .cal-modes { margin-left: 0; }
+  .cal-title { min-width: 0; flex-basis: 100%; }
+  .cal-cell { min-height: 64px; padding: 4px 3px; }
+  .cell-work { display: none; }
+  .cell-list { display: flex; flex-wrap: wrap; gap: 3px; }
+  .cell-list li { display: contents; }
+  .cell-ev { width: auto; padding: 0; }
+  .cell-ev span { display: none; }
+  .cell-ev i { width: 8px; height: 8px; border-radius: 50%; }
+  .cell-more { width: auto; padding: 0; font-size: 11px; }
   .amb-hud { left: 16px; top: 16px; }
   .ambient .amb-close { right: 16px; top: 16px; }
   .amb-help { display: none; }

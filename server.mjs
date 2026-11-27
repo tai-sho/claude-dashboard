@@ -6,7 +6,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TranscriptIndex, summarize, detail } from './lib/transcripts.mjs';
-import { segmentsOf, peakConcurrency, weekStats } from './lib/review.mjs';
+import { segmentsOf, blocksOf, peakConcurrency, weekStats } from './lib/review.mjs';
 import { collectSessions, SESSIONS_DIR, PROJECTS_DIR, HOOK_EVENTS_DIR, STATE_DIR, CLAUDE_DIR, projectLabel, hostIdFor, appSessionFor, loadAppSessions, gitStatus } from './lib/sessions.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -166,7 +166,7 @@ async function apiSession(url) {
 }
 
 // ---------- ふりかえり ----------
-// from: 今日の始まり（画面側の時刻で 0 時）。days: 週のまとめの日数
+// from: 週のまとめの最終日の始まり（画面側の時刻で 0 時）。days: 週のまとめの日数
 function apiReview(url) {
   const now = Date.now();
   const from = Number(url.searchParams.get('from')) || now - 86400000;
@@ -180,11 +180,31 @@ function apiReview(url) {
       const h = historyItem(a, l);
       return { sessionId: a.sessionId, name: h.name, project: h.project, timeline: a.timeline, live: l?.state?.key || null };
     });
-  const today = items
-    .map(it => ({ sessionId: it.sessionId, name: it.name, project: it.project, live: !!it.live, segs: segmentsOf(it.timeline, { from, to: now, live: it.live }) }))
-    .filter(r => r.segs.length)
-    .sort((a, b) => a.segs[0][0] - b.segs[0][0]);
-  return { from, now, today, todayPeak: peakConcurrency(today.map(r => r.segs)), week: weekStats(items, { from: weekFrom, to: now }) };
+  return { week: weekStats(items, { from: weekFrom, to: now }) };
+}
+
+// カレンダー: 期間内にセッションが動いていたひとまとまり。from / to は画面側の日の区切り（最長で約6週間）
+const CAL_MAX_MS = 45 * 86400000;
+function apiCalendar(url) {
+  const now = Date.now();
+  const to = Math.min(Number(url.searchParams.get('to')) || now, now);
+  const from = Math.max(Number(url.searchParams.get('from')) || to - 86400000, to - CAL_MAX_MS);
+  const live = liveById();
+  const sessions = [];
+  for (const a of index.all()) {
+    if (isNoise(a) || !a.promptCount || a.lastActivityAt < from || a.firstPromptAt > to) continue;
+    const l = live.get(a.sessionId);
+    const segs = segmentsOf(a.timeline, { from, to, live: l?.state?.key || null });
+    const blocks = blocksOf(segs);
+    if (!blocks.length) continue;
+    const h = historyItem(a, l);
+    sessions.push({ sessionId: a.sessionId, name: h.name, project: h.project, cwd: h.cwd, live: !!l, segs, blocks });
+  }
+  sessions.sort((x, y) => x.blocks[0].start - y.blocks[0].start);
+  const work = sessions.reduce((n, s) => n + s.blocks.reduce((m, b) => m + b.work.reduce((k, [ws, we]) => k + we - ws, 0), 0), 0);
+  const peak = peakConcurrency(sessions.map(s => s.segs));
+  for (const s of sessions) delete s.segs;
+  return { from, to, now, work, peak, sessions };
 }
 
 // ---------- HTTP ----------
@@ -214,6 +234,7 @@ const server = http.createServer(async (req, res) => {
       case '/api/ledger': return sendJson(res, { index: indexStatus, sessions: apiLedger() });
       case '/api/search': return sendJson(res, { index: indexStatus, sessions: apiSearch(url) });
       case '/api/review': return sendJson(res, { index: indexStatus, ...apiReview(url) });
+      case '/api/calendar': return sendJson(res, { index: indexStatus, ...apiCalendar(url) });
       case '/api/session': {
         const s = await apiSession(url);
         return s ? sendJson(res, s) : sendJson(res, { error: 'not found' }, 404);

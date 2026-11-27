@@ -137,16 +137,29 @@ describe('API', () => {
     assert.equal((await request('/api/session?id=missing')).status, 404);
   });
 
-  test('/api/review は今日の稼働帯と週のまとめを返す', async () => {
+  test('/api/review は週のまとめを返す', async () => {
     const { status, json } = await getJson('/api/review?from=' + (Date.now() - 2 * 3600000));
     assert.equal(status, 200);
-    const live = json.today.find(r => r.sessionId === 'live-1');
-    assert.ok(live, '稼働中のセッションが今日の帯に入る');
-    assert.equal(live.segs[0][2], 'w');
-    assert.equal(live.segs.at(-1)[2], 't'); // 返答のあとは「あなたの番」が今まで続く
-    assert.ok(!json.today.some(r => r.sessionId === 'sdk-1'));
     assert.equal(json.week.prompts, 2);
     assert.equal(json.week.sessions, 2);
+  });
+
+  test('/api/calendar は期間内に動いたまとまりを返し、SDK 起動を除く', async () => {
+    const now = Date.now();
+    const { status, json } = await getJson(`/api/calendar?from=${now - 2 * 3600000}&to=${now + 3600000}`);
+    assert.equal(status, 200);
+    assert.ok(json.to <= Date.now(), '終わりは今より先にしない');
+    assert.deepEqual(json.sessions.map(s => s.sessionId), ['old-1', 'live-1']); // 最初に動いた順
+    const old = json.sessions[0];
+    assert.equal(old.blocks.length, 1);
+    assert.equal(old.blocks[0].end - old.blocks[0].start, 100000);
+    assert.deepEqual(old.blocks[0].work, [[old.blocks[0].start, old.blocks[0].end]]);
+    assert.equal(json.sessions[1].live, true);
+    assert.ok(json.sessions[1].cwd, 'プロジェクトの色を決めるため作業フォルダを返す');
+    assert.equal(json.work, 100000 + 30000);
+    assert.equal(json.peak.peak, 1);
+    // 期間の外は返さない
+    assert.deepEqual((await getJson(`/api/calendar?from=${now - 50 * 86400000}&to=${now - 40 * 86400000}`)).json.sessions, []);
   });
 
   test('/api/state の稼働中セッションは心電図用の動きを持つ', async () => {
