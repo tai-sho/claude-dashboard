@@ -19,8 +19,23 @@
   --flap: #e2e6df;       /* 発車標の文字板 */
   --aged: #ecd6a4;       /* 待たせて焼けた紙 */
   --scorch: #9a5b16;     /* 焼けた縁 */
+  --shadow: 31 42 46;     /* 伝票の影の色（rgb の3つの値） */
+  --sheen: rgb(255 255 255 / .75); /* 指した伝票に映る光 */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .25 0 0 0 0 .2 0 0 0 0 .12 .34 0 0 0 -.1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: light;
 }
+/* テーマによらない材質: 浮き上がりの影（呼んでいる伝票ほど手前に出る）と判子のかすれ */
+:root {
+  --lift-0: 0 0 0 transparent;
+  --lift-1: 0 1px 1px rgb(var(--shadow) / .05), 0 2px 5px -1px rgb(var(--shadow) / .08);
+  --lift-2: 0 1px 1px rgb(var(--shadow) / .06), 0 4px 8px -2px rgb(var(--shadow) / .1), 0 12px 24px -10px rgb(var(--shadow) / .18);
+  --lift-3: 0 1px 2px rgb(var(--shadow) / .07), 0 6px 12px -3px rgb(var(--shadow) / .12), 0 22px 40px -14px rgb(var(--shadow) / .28);
+  --lift-hover: 0 2px 3px rgb(var(--shadow) / .07), 0 10px 18px -4px rgb(var(--shadow) / .14), 0 30px 50px -18px rgb(var(--shadow) / .32);
+  --ink-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='40'%3E%3Cfilter id='i'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.55 .9' numOctaves='3' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 4 0 0 0 -1.25'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23i)'/%3E%3C/svg%3E");
+  --spring: cubic-bezier(.2, .9, .25, 1);
+  --spring: linear(0, .283 6.3%, .507 12.5%, .677 18.8%, .8 25%, .885 31.3%, .942 37.5%, .977 43.8%, .998 50%, 1.009 56.3%, 1.015 68.8%, 1.011 81.3%, 1.007 93.8%, 1); /* 減衰ばね。少しだけ行き過ぎて戻る */
+}
+@property --glare { syntax: '<number>'; inherits: true; initial-value: 0; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #1a2124; --surface: #232c30; --surface-2: #1f272a;
@@ -28,6 +43,8 @@
     --call: #ef6a55; --call-soft: #4a2723; --turn: #f0b23c; --turn-soft: #45391f;
     --work: #8ea4ec; --work-soft: #28324d; --rest: #6e7a76; --ok: #6fbf92; --focus: #8ea4ec; --mark: #5e4f1c;
     --flap: #1a2225; --aged: #4a3b1d; --scorch: #e08a2e;
+    --shadow: 0 0 0; --sheen: rgb(255 255 255 / .1);
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 .16 0 0 0 -.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     color-scheme: dark;
   }
 }
@@ -36,7 +53,9 @@
   --ink: #e3e8e2; --ink-2: #aeb8b4; --ink-3: #7f8a87; --rule: #34403f;
   --call: #ef6a55; --call-soft: #4a2723; --turn: #f0b23c; --turn-soft: #45391f;
   --work: #8ea4ec; --work-soft: #28324d; --rest: #6e7a76; --ok: #6fbf92; --focus: #8ea4ec; --mark: #5e4f1c;
-    --flap: #1a2225; --aged: #4a3b1d; --scorch: #e08a2e;
+  --flap: #1a2225; --aged: #4a3b1d; --scorch: #e08a2e;
+  --shadow: 0 0 0; --sheen: rgb(255 255 255 / .1);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 .16 0 0 0 -.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: dark;
 }
 
@@ -149,6 +168,22 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1
 .hint code { font-size: 12.5px; background: var(--surface-2); padding: 1px 5px; border-radius: 3px; }
 
 main { padding: 8px 32px 48px; }
+
+/* 承認や確認を求めているあいだ、画面の上の縁が灯る（別のモニターに出していても目の端で分かる）。
+   新しく呼ばれたときは一度だけ強く光る。body の擬似要素は ::before だけを使う（::after は空けておく） */
+body::before {
+  content: ""; position: fixed; left: 0; right: 0; top: 0; height: 72px; z-index: 5; pointer-events: none;
+  border-top: 3px solid var(--call);
+  background: linear-gradient(color-mix(in oklab, var(--call) 14%, transparent), transparent);
+  opacity: 0; transition: opacity .6s ease; transform-origin: top;
+}
+body[data-calling]::before { opacity: 1; }
+body.arrive::before { animation: edge-arrive 1.6s ease-out; }
+@keyframes edge-arrive {
+  0% { opacity: 0; transform: scaleY(.4); }
+  12% { opacity: 1; transform: scaleY(2.6); filter: saturate(1.4); }
+  100% { opacity: 1; transform: scaleY(1); }
+}
 .lane { margin-top: 28px; }
 .lane > h2 {
   display: flex; align-items: baseline; gap: 10px;
@@ -192,30 +227,56 @@ main { padding: 8px 32px 48px; }
 .grid-proj { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; }
 .grid-proj + .rows { margin-top: 12px; }
 
-/* ---------- 伝票 ---------- */
+/* ---------- 伝票 ----------
+   紙の伝票を盤に挿している見立て。呼んでいる伝票ほど手前に浮き（影が深い）、待たせるほど紙が焼けて角が反る。
+   下の操作の欄は切り取り線で分けた半券。指すと少し持ち上がり、指した位置に光が映る */
 .ticket {
+  --elev: var(--lift-1);
   position: relative;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 4px 16px;
   padding: 16px 18px 14px 22px;
-  background: var(--paper, var(--surface));
-  border-radius: 4px;
+  background:
+    radial-gradient(130% 100% at var(--gx, 50%) var(--gy, 0%), color-mix(in srgb, var(--sheen) calc(var(--glare) * 100%), transparent), transparent 62%),
+    var(--strip, none),
+    var(--grain),
+    var(--paper, var(--surface));
+  border-radius: 5px;
   border: 1px solid var(--rule);
+  box-shadow: var(--scorched, 0 0 transparent), var(--elev);
 }
 /* 待たせている伝票は紙が焼けていく（--age: 0〜1） */
 .ticket.aged {
   --paper: color-mix(in oklab, var(--surface), var(--aged) calc(var(--age) * 100%));
-  box-shadow: inset 0 0 calc(4px + var(--age) * 26px) color-mix(in oklab, var(--scorch) calc(var(--age) * 42%), transparent);
+  --scorched: inset 0 0 calc(4px + var(--age) * 26px) color-mix(in oklab, var(--scorch) calc(var(--age) * 42%), transparent);
+}
+/* 焼けた紙は右下の角から反ってくる（紙の裏が見え、角の下は盤が見える） */
+.ticket.aged::after {
+  content: ""; position: absolute; right: -1px; bottom: -1px; pointer-events: none;
+  width: calc(max(0, var(--age) - .25) * 24px); aspect-ratio: 1; border-radius: 0 0 5px 0;
+  background: linear-gradient(to left top, var(--bg) 49%, rgb(var(--shadow) / .22) 50%, color-mix(in oklab, var(--paper), var(--scorch) 22%) 64%);
 }
 .ticket::before {
   content: ""; position: absolute; left: -1px; top: -1px; bottom: -1px; width: 6px;
-  border-radius: 4px 0 0 4px; background: var(--bar, var(--rest));
+  border-radius: 5px 0 0 5px; background: var(--bar, var(--rest));
 }
-.ticket[data-state="waiting"], .ticket[data-state="stalled"] { --bar: var(--call); background: linear-gradient(var(--call-soft), var(--call-soft)) top / 100% 3px no-repeat, var(--paper, var(--surface)); }
-.ticket[data-state="yours"] { --bar: var(--turn); }
+.ticket[data-state="waiting"], .ticket[data-state="stalled"] {
+  --bar: var(--call);
+  --strip: linear-gradient(var(--call-soft), var(--call-soft)) top / 100% 3px no-repeat;
+  --elev: var(--lift-3), 0 16px 34px -18px color-mix(in oklab, var(--call) 55%, transparent);
+}
+.ticket[data-state="yours"] { --bar: var(--turn); --elev: var(--lift-2); }
 .ticket[data-state="working"] { --bar: var(--work); }
 .ticket[data-state="idle"] { --bar: var(--rest); }
+@media (hover: hover) and (pointer: fine) {
+  .ticket { transition: transform .35s var(--spring), box-shadow .3s ease, --glare .3s ease; }
+  .ticket:hover { --glare: 1; --elev: var(--lift-hover); }
+  .ticket[data-state="waiting"]:hover, .ticket[data-state="stalled"]:hover { --elev: var(--lift-hover), 0 22px 40px -18px color-mix(in oklab, var(--call) 60%, transparent); }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .ticket:hover { transform: perspective(1100px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-2px); }
+}
 
 .t-name { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
 .t-name button { all: unset; cursor: pointer; }
@@ -232,38 +293,53 @@ main { padding: 8px 32px 48px; }
 .ticket[data-state="yours"] .clock .state { color: var(--turn); }
 .ticket[data-state="working"] .clock { color: var(--work); }
 .ticket.compact .clock .elapsed { font-size: 26px; }
-/* 発車標: 変わった桁だけがめくれる */
+/* 発車標: 変わった桁だけ、上半分が手前に倒れ、新しい下半分が落ちてくる。
+   層は下から、新しい字（上半分が見える）・古い下半分・倒れる古い上半分・落ちる新しい下半分 */
 .flap {
   display: inline-block; position: relative; min-width: .64em; padding: .06em .04em .02em; margin-left: .06em;
   text-align: center; background: var(--flap); border-radius: .1em; line-height: 1;
+  box-shadow: inset 0 -.04em 0 rgb(var(--shadow) / .08);
 }
+.flap > span {
+  position: absolute; inset: 0; padding: inherit; border-radius: inherit;
+  background: var(--flap); backface-visibility: hidden;
+}
+.flap .f-top { clip-path: inset(0 0 50% 0); transform: perspective(3em) rotateX(-90deg); animation: flap-fall .2s var(--d, 0s) cubic-bezier(.55, 0, .9, .45) both; }
+.flap .f-old { clip-path: inset(50% 0 0 0); }
+.flap .f-bot { clip-path: inset(50% 0 0 0); animation: flap-land .34s calc(var(--d, 0s) + .18s) cubic-bezier(.3, 1.45, .55, 1) both; }
 .flap::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--paper, var(--surface)); opacity: .8; }
-.flap.flip { animation: flap .5s cubic-bezier(.25, 1.5, .5, 1) both; transform-origin: 50% 50%; }
-@keyframes flap {
-  0% { transform: perspective(240px) rotateX(-92deg); filter: brightness(.7); }
-  100% { transform: perspective(240px) rotateX(0); filter: none; }
+@keyframes flap-fall {
+  from { transform: perspective(3em) rotateX(0); }
+  to { transform: perspective(3em) rotateX(-90deg); filter: brightness(.55); }
+}
+@keyframes flap-land {
+  from { transform: perspective(3em) rotateX(90deg); filter: brightness(1.35); }
+  to { transform: perspective(3em) rotateX(0); }
 }
 
-/* 心電図: 直近10分の動き。右端が今 */
+/* 心電図: 直近10分の動き。右端が今。古い動きほど薄れる（燐光の残像） */
 .ecg { grid-column: 1 / -1; position: relative; margin-top: 10px; height: 26px; }
-.ecg svg { display: block; width: 100%; height: 26px; overflow: visible; }
-.ecg path { fill: none; stroke: var(--work); stroke-width: 1.6; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.ecg svg { display: block; width: 100%; height: 26px; overflow: visible; -webkit-mask-image: linear-gradient(90deg, transparent, #000 55%); mask-image: linear-gradient(90deg, transparent, #000 55%); }
+.ecg path { fill: none; stroke: var(--work); stroke-width: 1.6; stroke-linejoin: round; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 2px color-mix(in oklab, var(--work) 45%, transparent)); }
 .ecg::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, var(--rule) 0 1px, transparent 1px 10%); opacity: .45; }
-.ecg-head { position: absolute; right: -3px; top: 16px; width: 6px; height: 6px; border-radius: 50%; background: var(--work); animation: breathe 1.2s ease-in-out infinite; }
-.ticket[data-state="stalled"] .ecg path { stroke: var(--call); }
-.ticket[data-state="stalled"] .ecg-head { background: var(--call); animation: none; }
+.ecg-head { position: absolute; right: -3px; top: 16px; width: 6px; height: 6px; border-radius: 50%; background: var(--work); box-shadow: 0 0 0 3px color-mix(in oklab, var(--work) 22%, transparent); animation: breathe 1.2s ease-in-out infinite; }
+.ticket[data-state="stalled"] .ecg path { stroke: var(--call); filter: none; }
+.ticket[data-state="stalled"] .ecg-head { background: var(--call); box-shadow: none; animation: none; }
 
-/* 閉じてよい: 判子 */
+/* 閉じてよい: 判子。朱肉のかすれを付け、押した瞬間は伝票が少し沈む */
 .flag.stamp {
   display: inline-block; padding: 0 7px; border: 2px solid currentColor; outline: 1px solid currentColor; outline-offset: 1px;
   border-radius: 3px; transform: rotate(-4deg); letter-spacing: .04em; line-height: 1.5;
+  -webkit-mask: var(--ink-mask) 0 0 / 90px 40px; mask: var(--ink-mask) 0 0 / 90px 40px;
 }
 .flag.stamp.pressed { animation: stamp .55s cubic-bezier(.2, .9, .3, 1.2) both; }
 @keyframes stamp {
   0% { transform: scale(2.4) rotate(-16deg); opacity: 0; }
-  55% { transform: scale(.92) rotate(-3deg); opacity: 1; box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 45%, transparent); }
-  100% { transform: scale(1) rotate(-4deg); box-shadow: 0 0 0 10px transparent; }
+  55% { transform: scale(.92) rotate(-3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(-4deg); }
 }
+.ticket.thud { animation: thud .5s .26s ease-out both; }
+@keyframes thud { 30% { transform: translateY(1px) scale(.985); box-shadow: var(--lift-0); } }
 
 .reason { grid-column: 1 / -1; margin: 8px 0 0; font-size: 14px; color: var(--ink-2); overflow-wrap: anywhere; }
 .ticket[data-state="waiting"] .reason, .ticket[data-state="stalled"] .reason { color: var(--call); font-weight: 500; }
@@ -285,7 +361,16 @@ main { padding: 8px 32px 48px; }
 .tools li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tools li b { font-weight: 600; color: var(--ink-2); margin-right: 6px; }
 
-.foot { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 12px; font-size: 13px; }
+/* 半券: 切り取り線と、両端の切り欠き（盤の色の丸で欠いて見せる） */
+.foot { grid-column: 1 / -1; position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 12px; padding-top: 11px; font-size: 13px; }
+.foot::before {
+  content: ""; position: absolute; left: -23px; right: -19px; top: -6px; height: 12px; pointer-events: none;
+  background:
+    radial-gradient(circle at 0 50%, var(--bg) 5px, var(--rule) 5.5px 6.5px, transparent 7px),
+    radial-gradient(circle at 100% 50%, var(--bg) 5px, var(--rule) 5.5px 6.5px, transparent 7px),
+    radial-gradient(circle, var(--rule) 1.1px, transparent 1.6px) 12px 50% / 7px 3px repeat-x content-box;
+  padding: 0 12px;
+}
 .flag { color: var(--ink-2); }
 .flag.dirty { color: var(--turn); font-weight: 600; }
 .flag.clear { color: var(--ok); font-weight: 600; }
@@ -299,9 +384,37 @@ main { padding: 8px 32px 48px; }
 
 .pulse { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--work); margin-right: 6px; vertical-align: 1px; animation: breathe 2.4s ease-in-out infinite; }
 @keyframes breathe { 50% { opacity: .25; } }
-.ticket.fresh { animation: ring 1.6s ease-out 1; }
-@keyframes ring { 0% { box-shadow: 0 0 0 0 var(--bar); } 100% { box-shadow: 0 0 0 14px transparent; } }
-@media (prefers-reduced-motion: reduce) { .pulse, .ticket.fresh, .flap.flip, .flag.stamp.pressed, .ecg-head { animation: none; } }
+.ticket.fresh { animation: ring 1.6s .5s ease-out 1 backwards; }
+@keyframes ring { 0% { box-shadow: 0 0 0 0 var(--bar), var(--elev); } 100% { box-shadow: 0 0 0 16px transparent, var(--elev); } }
+
+/* ---------- 盤面の入れ替わり（View Transitions） ----------
+   伝票は状態が変わると、裏返りながら新しい場所へ動く。新しく来た伝票は上から差し込まれ、終わった伝票は抜き取られる。
+   寝かせる伝票は行に畳まれる。名前（view-transition-name）は board.js が伝票ごとに付ける */
+::view-transition-group(*) { animation-duration: .62s; animation-timing-function: var(--spring); }
+/* 大きさが変わる伝票（伝票から行へ畳むときなど）は、絵を引き伸ばさずに元の大きさのまま切り抜く */
+::view-transition-old(*), ::view-transition-new(*) { animation-duration: .3s; height: 100%; object-fit: none; object-position: left top; }
+::view-transition-image-pair(*) { border-radius: 5px; }
+/* 名前を付けていない部分（見出しの件数など）は短く入れ替える */
+::view-transition-group(root) { animation-duration: .2s; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .2s; height: auto; object-fit: fill; }
+::view-transition-old(*.flip) { animation: vt-flip-out .24s cubic-bezier(.55, 0, .9, .45) both; mix-blend-mode: normal; backface-visibility: hidden; }
+::view-transition-new(*.flip) { animation: vt-flip-in .46s .22s var(--spring) both; mix-blend-mode: normal; backface-visibility: hidden; }
+::view-transition-new(*):only-child { animation: vt-enter .5s var(--spring) both; }
+::view-transition-old(*):only-child { animation: vt-exit .28s cubic-bezier(.5, 0, .9, .5) both; }
+@keyframes vt-flip-out { to { transform: perspective(1400px) rotateY(90deg) scale(1.03); filter: brightness(.8); } }
+@keyframes vt-flip-in { from { transform: perspective(1400px) rotateY(-90deg) scale(1.03); filter: brightness(.8); } }
+@keyframes vt-enter { from { opacity: 0; transform: translateY(-18px) scale(.96); } }
+@keyframes vt-exit { to { opacity: 0; transform: translateX(24px) rotate(1.5deg); } }
+
+/* コントラストを上げる設定では、紙の粒・光・反りを出さず、輪郭をはっきりさせる */
+@media (prefers-contrast: more) {
+  .ticket { --grain: none; --sheen: transparent; border-color: var(--ink-3); }
+  .ticket.aged::after { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse, .ticket.fresh, .ticket.thud, .flag.stamp.pressed, .ecg-head, .flap > span, body.arrive::before { animation: none; }
+  .ticket { transition: none; }
+}
 
 /* ---------- 行の一覧（寝かせ・台帳・履歴） ---------- */
 .rows { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
